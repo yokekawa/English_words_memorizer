@@ -1,0 +1,40 @@
+{
+  "name": "english-words-memorizer",
+  "version": "1.0.0",
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "expo": "~51.0.28",
+    "expo-camera": "~15.0.16",
+    "expo-sqlite": "~14.0.6",
+    "expo-av": "~14.0.7",
+    "expo-haptics": "~13.0.1",
+    "expo-image-manipulator": "~12.0.5",
+    "expo-constants": "~16.0.2",
+    "expo-status-bar": "~1.12.1",
+    "@react-navigation/native": "^6.1.17",
+    "@react-navigation/bottom-tabs": "^6.5.20",
+    "@react-navigation/native-stack": "^6.9.26",
+    "react-native-screens": "~3.31.1",
+    "react-native-safe-area-context": "4.10.5",
+    "react-native-gesture-handler": "~2.16.1",
+    "react-native-reanimated": "~3.10.1",
+    "zustand": "^4.5.4",
+    "en-inflectors": "^1.0.12",
+    "@react-native-community/datetimepicker": "^8.2.0",
+    "react": "18.2.0",
+    "react-native": "0.74.5"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.0",
+    "@types/react": "~18.2.45",
+    "@types/react-native": "~0.73.0",
+    "typescript": "^5.3.0"
+  },
+  "private": true
+}
