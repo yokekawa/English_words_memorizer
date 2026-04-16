@@ -10,6 +10,7 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RegistrationStackParams } from '@/types';
 import SelectableWord from '@/components/ocr/SelectableWord';
+import Button from '@/components/common/Button';
 import { wordRegistrationService } from '@/services/wordRegistrationService';
 import { useWordStore } from '@/store/wordStore';
 import { Colors, Spacing, FontSize, FontWeight } from '@/constants';
@@ -18,14 +19,13 @@ type WordStatus = 'idle' | 'selected' | 'loading' | 'registered' | 'error';
 
 type Props = NativeStackScreenProps<RegistrationStackParams, 'OCRReview'>;
 
-// Extract unique English words from OCR text
 function extractWords(text: string): string[] {
   const matches = text.match(/[a-zA-Z]+/g) ?? [];
   const unique = [...new Set(matches.map(w => w.toLowerCase()))];
   return unique.filter(w => w.length >= 2);
 }
 
-export default function OCRReviewScreen({ navigation, route }: Props) {
+export default function OCRReviewScreen({ route }: Props) {
   const { imageUri, rawText } = route.params;
   const addWord = useWordStore(s => s.addWord);
 
@@ -33,77 +33,118 @@ export default function OCRReviewScreen({ navigation, route }: Props) {
   const [wordStatuses, setWordStatuses] = useState<Record<string, WordStatus>>(
     () => Object.fromEntries(words.map(w => [w, 'idle']))
   );
+  const [isRegistering, setIsRegistering] = useState(false);
 
   const setStatus = (word: string, status: WordStatus) => {
     setWordStatuses(prev => ({ ...prev, [word]: status }));
   };
 
-  const handleWordPress = async (word: string) => {
+  const selectedWords = Object.entries(wordStatuses)
+    .filter(([, s]) => s === 'selected')
+    .map(([w]) => w);
+
+  const handleWordPress = (word: string) => {
     const current = wordStatuses[word];
-    if (current === 'loading' || current === 'registered') return;
+    if (current === 'loading' || current === 'registered' || isRegistering) return;
+    setStatus(word, current === 'selected' ? 'idle' : 'selected');
+  };
 
-    if (current === 'selected') {
-      // Deselect
-      setStatus(word, 'idle');
-      return;
-    }
+  const handleBatchRegister = async () => {
+    if (selectedWords.length === 0 || isRegistering) return;
+    setIsRegistering(true);
 
-    setStatus(word, 'loading');
-    try {
-      const alreadyRegistered = await wordRegistrationService.isAlreadyRegistered(word);
-      if (alreadyRegistered) {
-        Alert.alert('登録済み', `「${word}」はすでに単語帳に登録されています。`);
+    setWordStatuses(prev => {
+      const next = { ...prev };
+      selectedWords.forEach(w => { next[w] = 'loading'; });
+      return next;
+    });
+
+    let successCount = 0;
+    let skipCount = 0;
+    let failCount = 0;
+
+    for (const word of selectedWords) {
+      try {
+        const alreadyRegistered = await wordRegistrationService.isAlreadyRegistered(word);
+        if (alreadyRegistered) {
+          setStatus(word, 'registered');
+          skipCount++;
+          continue;
+        }
+        const draft = await wordRegistrationService.buildDraft(word);
+        const registered = await wordRegistrationService.registerWord(draft);
+        addWord(registered);
         setStatus(word, 'registered');
-        return;
+        successCount++;
+      } catch {
+        setStatus(word, 'error');
+        failCount++;
       }
-
-      const draft = await wordRegistrationService.buildDraft(word);
-      navigation.navigate('WordDetail', { wordDraft: draft });
-      setStatus(word, 'idle');
-    } catch {
-      setStatus(word, 'error');
-      Alert.alert('エラー', `「${word}」の情報取得に失敗しました。`);
     }
+
+    setIsRegistering(false);
+
+    const parts: string[] = [];
+    if (successCount > 0) parts.push(`${successCount}語を登録`);
+    if (skipCount > 0) parts.push(`${skipCount}語は登録済み`);
+    if (failCount > 0) parts.push(`${failCount}語が失敗`);
+    Alert.alert('完了', parts.join('、') + 'しました。');
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-    >
-      <Image
-        source={{ uri: imageUri }}
-        style={styles.image}
-        resizeMode="contain"
-      />
+    <View style={styles.screen}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+      >
+        <Image
+          source={{ uri: imageUri }}
+          style={styles.image}
+          resizeMode="contain"
+        />
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          単語をタップして登録 ({words.length}語)
-        </Text>
-        <Text style={styles.sectionHint}>
-          タップすると発音・日本語・活用形を自動取得して登録画面に進みます
-        </Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            単語をタップして選択 ({words.length}語)
+          </Text>
+          <Text style={styles.sectionHint}>
+            複数選択して「登録」ボタンでまとめて登録できます
+          </Text>
 
-        <View style={styles.wordCloud}>
-          {words.map(word => (
-            <SelectableWord
-              key={word}
-              word={word}
-              status={wordStatuses[word] ?? 'idle'}
-              onPress={() => handleWordPress(word)}
-            />
-          ))}
+          <View style={styles.wordCloud}>
+            {words.map(word => (
+              <SelectableWord
+                key={word}
+                word={word}
+                status={wordStatuses[word] ?? 'idle'}
+                onPress={() => handleWordPress(word)}
+              />
+            ))}
+          </View>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+
+      {selectedWords.length > 0 && (
+        <View style={styles.bottomBar}>
+          <Button
+            label={isRegistering ? '登録中...' : `選択した ${selectedWords.length} 語を登録`}
+            onPress={handleBatchRegister}
+            loading={isRegistering}
+            disabled={isRegistering}
+          />
+        </View>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  container: {
+    flex: 1,
   },
   content: {
     paddingBottom: Spacing.xl,
@@ -131,5 +172,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: Spacing.sm,
+  },
+  bottomBar: {
+    padding: Spacing.md,
+    backgroundColor: Colors.background,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 8,
   },
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Vibration } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -9,6 +9,9 @@ const ROWS = [
   ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
   ['Z', 'X', 'C', 'V', 'B', 'N', 'M'],
 ];
+
+// Special characters needed for English words (hyphens, apostrophes)
+const SPECIAL_CHARS = ["'", '-'];
 
 interface VirtualKeyboardProps {
   onKeyPress: (key: string) => void;
@@ -55,16 +58,6 @@ export default function VirtualKeyboard({
     <View style={styles.container}>
       {ROWS.map((row, rowIndex) => (
         <View key={rowIndex} style={styles.row}>
-          {rowIndex === 2 && (
-            <TouchableOpacity
-              style={[styles.key, styles.actionKey, styles.backspaceKey]}
-              onPress={handleBackspace}
-              disabled={disabled}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.actionKeyText}>⌫</Text>
-            </TouchableOpacity>
-          )}
           {row.map(letter => (
             <TouchableOpacity
               key={letter}
@@ -76,23 +69,46 @@ export default function VirtualKeyboard({
               <Text style={styles.keyText}>{letter}</Text>
             </TouchableOpacity>
           ))}
-          {rowIndex === 2 && (
-            <TouchableOpacity
-              style={[
-                styles.key,
-                styles.actionKey,
-                styles.submitKey,
-                (!currentInput || disabled) && styles.submitDisabled,
-              ]}
-              onPress={handleSubmit}
-              disabled={!currentInput || disabled}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.actionKeyText}>✓</Text>
-            </TouchableOpacity>
-          )}
         </View>
       ))}
+
+      {/* Bottom row: backspace + special chars + submit */}
+      <View style={styles.row}>
+        <TouchableOpacity
+          style={[styles.key, styles.actionKey, styles.backspaceKey]}
+          onPress={handleBackspace}
+          disabled={disabled}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.actionKeyText}>⌫</Text>
+        </TouchableOpacity>
+
+        {SPECIAL_CHARS.map(char => (
+          <TouchableOpacity
+            key={char}
+            style={[styles.key, styles.specialCharKey, disabled && styles.keyDisabled]}
+            onPress={() => handleKey(char)}
+            disabled={disabled}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.specialCharText}>{char}</Text>
+          </TouchableOpacity>
+        ))}
+
+        <TouchableOpacity
+          style={[
+            styles.key,
+            styles.actionKey,
+            styles.submitKey,
+            (!currentInput || disabled) && styles.submitDisabled,
+          ]}
+          onPress={handleSubmit}
+          disabled={!currentInput || disabled}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.actionKeyText}>✓</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -126,6 +142,16 @@ const styles = StyleSheet.create({
   keyText: {
     fontSize: FontSize.md,
     fontWeight: FontWeight.semibold,
+    color: Colors.keyboard.text,
+  },
+  specialCharKey: {
+    flex: 1.5,
+    maxWidth: 52,
+    backgroundColor: Colors.keyboard.backspace,
+  },
+  specialCharText: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
     color: Colors.keyboard.text,
   },
   keyDisabled: {
