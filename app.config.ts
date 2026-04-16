@@ -32,7 +32,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         cameraPermission: 'カメラを使用して教科書のテキストを読み取ります。',
       },
     ],
-    'expo-sqlite',
     [
       'expo-av',
       {
