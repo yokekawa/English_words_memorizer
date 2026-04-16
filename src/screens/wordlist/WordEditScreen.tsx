@@ -12,31 +12,39 @@ import {
 } from 'react-native';
 import { Audio } from 'expo-av';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { WordListStackParams, Word } from '@/types';
+import { WordListStackParams, Word, PartOfSpeech } from '@/types';
 import Button from '@/components/common/Button';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { useWordStore } from '@/store/wordStore';
 import { getDatabase } from '@/database/db';
 import { WordRepository } from '@/database/repositories/wordRepository';
+import { ConjugationRepository } from '@/database/repositories/conjugationRepository';
+import { generateConjugations } from '@/api/conjugation/inflectorsService';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants';
 
 type Props = NativeStackScreenProps<WordListStackParams, 'WordEdit'>;
 
-const POS_LABELS: Record<string, string> = {
-  noun: '名詞', verb: '動詞', adjective: '形容詞', adverb: '副詞',
-  pronoun: '代名詞', preposition: '前置詞', conjunction: '接続詞',
-  interjection: '感嘆詞', unknown: '不明',
-};
+const POS_OPTIONS: { pos: PartOfSpeech; label: string }[] = [
+  { pos: 'noun',         label: '名詞' },
+  { pos: 'verb',         label: '動詞' },
+  { pos: 'adjective',    label: '形容詞' },
+  { pos: 'adverb',       label: '副詞' },
+  { pos: 'pronoun',      label: '代名詞' },
+  { pos: 'preposition',  label: '前置詞' },
+  { pos: 'conjunction',  label: '接続詞' },
+  { pos: 'interjection', label: '感嘆詞' },
+  { pos: 'unknown',      label: 'その他' },
+];
 
 const CONJ_LABELS: Record<string, string> = {
   past_tense: '過去形', past_participle: '過去分詞', present_participle: '現在分詞',
-  third_person_singular: '三人称単数', plural: '複数形',
+  third_person_singular: '三単現', plural: '複数形',
   comparative: '比較級', superlative: '最上級',
 };
 
 export default function WordEditScreen({ navigation, route }: Props) {
   const { wordId } = route.params;
-  const { deleteWord, updateWord } = useWordStore();
+  const { deleteWord, refreshWord } = useWordStore();
   const [word, setWord] = useState<Word | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -44,25 +52,30 @@ export default function WordEditScreen({ navigation, route }: Props) {
 
   const [editBaseForm, setEditBaseForm] = useState('');
   const [editJpMeaning, setEditJpMeaning] = useState('');
+  const [editPos, setEditPos] = useState<PartOfSpeech>('unknown');
 
-  useEffect(() => {
-    (async () => {
-      const db = await getDatabase();
-      const repo = new WordRepository(db);
-      const found = await repo.findById(wordId);
-      setWord(found);
-      if (found) {
-        setEditBaseForm(found.baseForm);
-        setEditJpMeaning(found.japaneseMeaning);
-        navigation.setOptions({ title: found.baseForm });
-      }
-      setIsLoading(false);
-    })();
-  }, [wordId]);
+  const loadWord = async () => {
+    const db = await getDatabase();
+    const repo = new WordRepository(db);
+    const found = await repo.findById(wordId);
+    setWord(found);
+    if (found) {
+      setEditBaseForm(found.baseForm);
+      setEditJpMeaning(found.japaneseMeaning);
+      setEditPos(found.partOfSpeech);
+      navigation.setOptions({ title: found.baseForm });
+    }
+    setIsLoading(false);
+  };
+
+  useEffect(() => { loadWord(); }, [wordId]);
 
   const isDirty =
-    word !== null &&
-    (editBaseForm.trim() !== word.baseForm || editJpMeaning.trim() !== word.japaneseMeaning);
+    word !== null && (
+      editBaseForm.trim() !== word.baseForm ||
+      editJpMeaning.trim() !== word.japaneseMeaning ||
+      editPos !== word.partOfSpeech
+    );
 
   const handleSave = async () => {
     if (!word || !isDirty) return;
@@ -73,9 +86,23 @@ export default function WordEditScreen({ navigation, route }: Props) {
       return;
     }
     setIsSaving(true);
-    await updateWord(word.id, { baseForm: base, japaneseMeaning: jp });
-    setWord(prev => prev ? { ...prev, baseForm: base, japaneseMeaning: jp } : prev);
-    navigation.setOptions({ title: base });
+    const db = await getDatabase();
+    const wordRepo = new WordRepository(db);
+    const conjRepo = new ConjugationRepository(db);
+
+    await wordRepo.update(word.id, { baseForm: base, japaneseMeaning: jp, partOfSpeech: editPos });
+
+    // Regenerate conjugations when POS or base form changed
+    if (editPos !== word.partOfSpeech || base !== word.baseForm) {
+      await conjRepo.deleteByWordId(word.id);
+      const newConjs = generateConjugations(base, editPos);
+      for (const c of newConjs) {
+        await conjRepo.insert(word.id, c.type, c.form);
+      }
+    }
+
+    await refreshWord(word.id);
+    await loadWord();
     setIsSaving(false);
   };
 
@@ -129,6 +156,7 @@ export default function WordEditScreen({ navigation, route }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+
         {/* Edit form */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>単語を編集</Text>
@@ -156,6 +184,28 @@ export default function WordEditScreen({ navigation, route }: Props) {
             />
           </View>
 
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>品詞</Text>
+            <View style={styles.posGrid}>
+              {POS_OPTIONS.map(({ pos, label }) => (
+                <TouchableOpacity
+                  key={pos}
+                  style={[styles.posChip, editPos === pos && styles.posChipActive]}
+                  onPress={() => setEditPos(pos)}
+                >
+                  <Text style={[styles.posChipText, editPos === pos && styles.posChipTextActive]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {editPos !== word.partOfSpeech && (
+              <Text style={styles.posHint}>
+                ※ 品詞を変更すると活用形が自動で再生成されます
+              </Text>
+            )}
+          </View>
+
           <Button
             label="保存"
             onPress={handleSave}
@@ -164,35 +214,39 @@ export default function WordEditScreen({ navigation, route }: Props) {
           />
         </View>
 
-        {/* Word info (read-only) */}
-        <View style={styles.card}>
-          <View style={styles.infoRow}>
-            <Text style={styles.posLabel}>{POS_LABELS[word.partOfSpeech] ?? word.partOfSpeech}</Text>
-            {word.phonetic?.text && (
-              <Text style={styles.phonetic}>{word.phonetic.text}</Text>
+        {/* Conjugations & audio */}
+        {(word.conjugations.length > 0 || word.phonetic) && (
+          <View style={styles.card}>
+            {word.phonetic && (
+              <View style={styles.infoRow}>
+                {word.phonetic.text && (
+                  <Text style={styles.phonetic}>{word.phonetic.text}</Text>
+                )}
+                {word.phonetic.audioUrl && (
+                  <TouchableOpacity onPress={playAudio} disabled={isPlayingAudio} style={styles.audioBtn}>
+                    <Text style={styles.audioBtnText}>
+                      {isPlayingAudio ? '🔊 再生中' : '🔊 発音を聞く'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             )}
-            {word.phonetic?.audioUrl && (
-              <TouchableOpacity onPress={playAudio} disabled={isPlayingAudio}>
-                <Text style={styles.audioIcon}>{isPlayingAudio ? '🔊' : '▶'}</Text>
-              </TouchableOpacity>
+            {word.exampleSentence && (
+              <Text style={styles.example}>例: {word.exampleSentence}</Text>
+            )}
+            {word.conjugations.length > 0 && (
+              <View style={styles.conjugations}>
+                <Text style={styles.fieldLabel}>活用形</Text>
+                {word.conjugations.map(c => (
+                  <View key={c.id} style={styles.conjRow}>
+                    <Text style={styles.conjType}>{CONJ_LABELS[c.type] ?? c.type}</Text>
+                    <Text style={styles.conjForm}>{c.form}</Text>
+                  </View>
+                ))}
+              </View>
             )}
           </View>
-
-          {word.exampleSentence && (
-            <Text style={styles.example}>例: {word.exampleSentence}</Text>
-          )}
-
-          {word.conjugations.length > 0 && (
-            <View style={styles.conjugations}>
-              {word.conjugations.map(c => (
-                <View key={c.id} style={styles.conjRow}>
-                  <Text style={styles.conjType}>{CONJ_LABELS[c.type] ?? c.type}</Text>
-                  <Text style={styles.conjForm}>{c.form}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
+        )}
 
         {/* Stats */}
         <View style={styles.card}>
@@ -245,41 +299,35 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     gap: Spacing.sm,
   },
-  cardTitle: {
-    fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text,
-  },
+  cardTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
   field: { gap: 4 },
-  fieldLabel: {
-    fontSize: FontSize.xs, fontWeight: FontWeight.medium, color: Colors.textSecondary,
-  },
+  fieldLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.medium, color: Colors.textSecondary },
   input: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.sm,
-    fontSize: FontSize.md,
-    color: Colors.text,
-    backgroundColor: Colors.background,
+    borderWidth: 1, borderColor: Colors.border, borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.sm, paddingVertical: Spacing.sm,
+    fontSize: FontSize.md, color: Colors.text, backgroundColor: Colors.background,
   },
-  inputMultiline: {
-    minHeight: 72,
-    textAlignVertical: 'top',
+  inputMultiline: { minHeight: 72, textAlignVertical: 'top' },
+  posGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs, marginTop: 4 },
+  posChip: {
+    paddingHorizontal: Spacing.sm, paddingVertical: 5,
+    borderRadius: BorderRadius.full, borderWidth: 1.5, borderColor: Colors.border,
+    backgroundColor: Colors.surface,
   },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  posLabel: {
-    fontSize: FontSize.xs, fontWeight: FontWeight.bold,
-    color: Colors.textOnPrimary, backgroundColor: Colors.primary,
-    paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10,
-  },
+  posChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  posChipText: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
+  posChipTextActive: { color: Colors.textOnPrimary },
+  posHint: { fontSize: FontSize.xs, color: Colors.warning, marginTop: 2 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' },
   phonetic: { fontSize: FontSize.sm, color: Colors.textSecondary, fontStyle: 'italic' },
-  audioIcon: { fontSize: FontSize.md, color: Colors.primary },
+  audioBtn: {
+    paddingVertical: 4, paddingHorizontal: Spacing.sm,
+    borderRadius: 16, backgroundColor: Colors.surfaceSecondary, borderWidth: 1, borderColor: Colors.border,
+  },
+  audioBtnText: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: FontWeight.medium },
   example: { fontSize: FontSize.sm, color: Colors.textSecondary, fontStyle: 'italic' },
   conjugations: { gap: 4 },
-  conjRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    paddingVertical: 2,
-  },
+  conjRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 },
   conjType: { fontSize: FontSize.sm, color: Colors.textSecondary },
   conjForm: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.text },
   statsRow: { flexDirection: 'row', alignItems: 'center' },
