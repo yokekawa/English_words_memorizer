@@ -73,6 +73,47 @@ function weightedShuffle(words: Word[]): Word[] {
     .map(item => item.word);
 }
 
+async function loadCandidates(repo: WordRepository, filter: WordFilter): Promise<Word[]> {
+  if (filter.type === 'word_ids') {
+    return repo.findByIds(filter.ids);
+  }
+
+  let words: Word[];
+  switch (filter.type) {
+    case 'due':
+      words = await repo.findDueForReview();
+      break;
+    case 'recent':
+      words = await repo.findRecent(filter.days);
+      break;
+    case 'date_range':
+      words = await repo.findByDateRange(filter.from, filter.to);
+      break;
+    default:
+      words = await repo.findAll();
+  }
+
+  if ('pos' in filter && filter.pos && filter.pos.length > 0) {
+    words = words.filter(w => filter.pos!.includes(w.partOfSpeech));
+  }
+  return words;
+}
+
+function applyModeFilter(words: Word[], mode: QuizMode): Word[] {
+  if (mode === 'base_to_comparative') {
+    return words.filter(w =>
+      w.conjugations.some(c => c.type === 'comparative' || c.type === 'superlative')
+    );
+  }
+  const config = QUIZ_MODE_CONFIGS.find(c => c.mode === mode);
+  if (config?.requiredConjugationType) {
+    return words.filter(w =>
+      w.conjugations.some(c => c.type === config.requiredConjugationType)
+    );
+  }
+  return words;
+}
+
 export class QuizGenerationService {
   async createSession(
     mode: QuizMode,
@@ -82,33 +123,7 @@ export class QuizGenerationService {
     const db = await getDatabase();
     const repo = new WordRepository(db);
 
-    let candidates: Word[];
-    switch (filter.type) {
-      case 'due':
-        candidates = await repo.findDueForReview();
-        break;
-      case 'recent':
-        candidates = await repo.findRecent(filter.days);
-        break;
-      case 'date_range':
-        candidates = await repo.findByDateRange(filter.from, filter.to);
-        break;
-      default:
-        candidates = await repo.findAll();
-    }
-
-    // Filter to words that have required conjugation
-    const config = QUIZ_MODE_CONFIGS.find(c => c.mode === mode);
-    if (mode === 'base_to_comparative') {
-      candidates = candidates.filter(w =>
-        w.conjugations.some(c => c.type === 'comparative' || c.type === 'superlative')
-      );
-    } else if (config?.requiredConjugationType) {
-      candidates = candidates.filter(w =>
-        w.conjugations.some(c => c.type === config.requiredConjugationType)
-      );
-    }
-
+    const candidates = applyModeFilter(await loadCandidates(repo, filter), mode);
     const selected = weightedShuffle(candidates).slice(0, wordCount);
     const questions: QuizQuestion[] = selected
       .map(w => buildQuestion(w, mode))
@@ -127,35 +142,8 @@ export class QuizGenerationService {
   async countAvailableWords(mode: QuizMode, filter: WordFilter): Promise<number> {
     const db = await getDatabase();
     const repo = new WordRepository(db);
-
-    if (filter.type === 'date_range') {
-      return repo.countByDateRange(filter.from, filter.to);
-    }
-
-    let words: Word[];
-    switch (filter.type) {
-      case 'due':
-        words = await repo.findDueForReview();
-        break;
-      case 'recent':
-        words = await repo.findRecent(filter.days);
-        break;
-      default:
-        words = await repo.findAll();
-    }
-
-    if (mode === 'base_to_comparative') {
-      return words.filter(w =>
-        w.conjugations.some(c => c.type === 'comparative' || c.type === 'superlative')
-      ).length;
-    }
-    const config = QUIZ_MODE_CONFIGS.find(c => c.mode === mode);
-    if (config?.requiredConjugationType) {
-      return words.filter(w =>
-        w.conjugations.some(c => c.type === config.requiredConjugationType)
-      ).length;
-    }
-    return words.length;
+    const candidates = applyModeFilter(await loadCandidates(repo, filter), mode);
+    return candidates.length;
   }
 }
 

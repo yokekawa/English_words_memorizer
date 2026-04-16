@@ -5,11 +5,14 @@ export type QuizMode =
   | 'base_to_participle'
   | 'base_to_comparative';
 
+import { PartOfSpeech } from './word.types';
+
 export type WordFilter =
-  | { type: 'all' }
-  | { type: 'due' }
-  | { type: 'recent'; days: number }
-  | { type: 'date_range'; from: string; to: string };
+  | { type: 'all'; pos?: PartOfSpeech[] }
+  | { type: 'due'; pos?: PartOfSpeech[] }
+  | { type: 'recent'; days: number; pos?: PartOfSpeech[] }
+  | { type: 'date_range'; from: string; to: string; pos?: PartOfSpeech[] }
+  | { type: 'word_ids'; ids: number[] };
 
 export interface QuizQuestion {
   id: string;

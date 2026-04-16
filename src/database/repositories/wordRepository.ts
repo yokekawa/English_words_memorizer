@@ -78,6 +78,17 @@ export class WordRepository {
     return this.attachConjugations(rows);
   }
 
+  async findByIds(ids: number[]): Promise<Word[]> {
+    if (ids.length === 0) return [];
+    const placeholders = ids.map(() => '?').join(',');
+    const rows = await queryAll<WordRow>(
+      this.db,
+      `SELECT * FROM words WHERE id IN (${placeholders}) ORDER BY created_at DESC`,
+      ids
+    );
+    return this.attachConjugations(rows);
+  }
+
   async findByDateRange(from: string, to: string): Promise<Word[]> {
     const rows = await queryAll<WordRow>(
       this.db,
