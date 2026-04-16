@@ -50,7 +50,8 @@ export async function recognizeText(
   });
 
   if (!response.ok) {
-    throw new Error(`Vision API エラー: ${response.status} ${response.statusText}`);
+    const errorBody = await response.text().catch(() => '');
+    throw new Error(`Vision API エラー: ${response.status}\n${errorBody}`);
   }
 
   const data: VisionResponse = await response.json();
