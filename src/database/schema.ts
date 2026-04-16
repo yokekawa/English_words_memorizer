@@ -50,6 +50,15 @@ export const CREATE_QUIZ_ATTEMPTS_TABLE = `
   )
 `;
 
+export const CREATE_SAVED_RANGES_TABLE = `
+  CREATE TABLE IF NOT EXISTS saved_ranges (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,
+    filter_json TEXT NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`;
+
 export const CREATE_INDEXES = [
   `CREATE INDEX IF NOT EXISTS idx_conjugations_word_id ON conjugations(word_id)`,
   `CREATE INDEX IF NOT EXISTS idx_attempts_word_id ON quiz_attempts(word_id)`,

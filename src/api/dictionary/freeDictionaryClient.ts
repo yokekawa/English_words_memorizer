@@ -41,14 +41,6 @@ const POS_MAP: Record<string, PartOfSpeech> = {
   interjection: 'interjection',
 };
 
-// Prioritise the most educationally useful POS when a word has multiple.
-// Verb first so learners practice conjugations; conjunction/preposition before noun
-// because words like "and"/"in" are wrongly listed as nouns by some API entries.
-const POS_PRIORITY: PartOfSpeech[] = [
-  'verb', 'conjunction', 'preposition', 'pronoun',
-  'adjective', 'adverb', 'noun', 'interjection',
-];
-
 export async function lookupWord(word: string): Promise<DictionaryResult> {
   const url = `${BASE_URL}/${encodeURIComponent(word.toLowerCase())}`;
   const response = await fetch(url);
@@ -73,11 +65,19 @@ export async function lookupWord(word: string): Promise<DictionaryResult> {
     ? { text: bestPhonetic.text, audioUrl: bestPhonetic.audio || undefined }
     : null;
 
-  // Collect all POS present in the API response, then pick by priority
-  const allPos = entry.meanings.map(m => POS_MAP[m.partOfSpeech]).filter(Boolean) as PartOfSpeech[];
-  const partOfSpeech = POS_PRIORITY.find(p => allPos.includes(p)) ?? 'unknown';
+  // Pick the POS with the most definitions — more definitions = primary usage.
+  // This correctly resolves "do/go/have" (verb-heavy) vs "web" (noun-heavy).
+  const posScores = new Map<PartOfSpeech, number>();
+  for (const meaning of entry.meanings) {
+    const pos = POS_MAP[meaning.partOfSpeech];
+    if (pos) posScores.set(pos, (posScores.get(pos) ?? 0) + meaning.definitions.length);
+  }
+  let partOfSpeech: PartOfSpeech = 'unknown';
+  let maxScore = 0;
+  for (const [pos, score] of posScores) {
+    if (score > maxScore) { maxScore = score; partOfSpeech = pos; }
+  }
 
-  // Use the meaning that matches the chosen POS for the example sentence
   const chosenMeaning =
     entry.meanings.find(m => (POS_MAP[m.partOfSpeech] ?? 'unknown') === partOfSpeech)
     ?? entry.meanings[0];

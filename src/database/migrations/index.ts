@@ -1,5 +1,6 @@
 import { Database, queryAll, execute, executeMany } from '../helpers';
 import { migrate001 } from './001_initial';
+import { migrate002 } from './002_saved_ranges';
 
 const CREATE_MIGRATIONS_TABLE = `
   CREATE TABLE IF NOT EXISTS migrations (
@@ -13,6 +14,7 @@ type MigrationFn = (db: Database) => Promise<void>;
 
 const migrations: { version: number; fn: MigrationFn }[] = [
   { version: 1, fn: migrate001 },
+  { version: 2, fn: migrate002 },
 ];
 
 export async function runMigrations(db: Database): Promise<void> {
