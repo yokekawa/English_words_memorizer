@@ -30,13 +30,13 @@ export default function Button({
 }: ButtonProps) {
   const isDisabled = disabled || loading;
 
-  const containerStyle: ViewStyle[] = [
+  const containerStyle = [
     styles.base,
     styles[`variant_${variant}`],
     styles[`size_${size}`],
-    isDisabled && styles.disabled,
-    style ?? {},
-  ];
+    isDisabled ? styles.disabled : undefined,
+    style,
+  ] as ViewStyle[];
 
   const textStyle: TextStyle[] = [
     styles.label,

@@ -131,7 +131,7 @@ export class WordRepository {
         draft.exampleSentence ?? null,
       ]
     );
-    const wordId = result.insertId;
+    const wordId = result.lastInsertRowId;
     const conjRepo = new ConjugationRepository(this.db);
     for (const conj of draft.conjugations) {
       await conjRepo.insert(wordId, conj.type, conj.form);

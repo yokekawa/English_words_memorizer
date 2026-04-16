@@ -18,7 +18,7 @@ export default function AnswerInput({
   const displayLength = maxLength;
   const chars = value.split('');
 
-  let borderColor = Colors.border;
+  let borderColor: string = Colors.border;
   if (isCorrect === true) borderColor = Colors.success;
   if (isCorrect === false) borderColor = Colors.error;
 

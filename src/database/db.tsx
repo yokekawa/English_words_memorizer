@@ -8,7 +8,7 @@ let initPromise: Promise<Database> | null = null;
 export function getDatabase(): Promise<Database> {
   if (!initPromise) {
     initPromise = (async () => {
-      const db = SQLite.openDatabase('english_words.db');
+      const db = await SQLite.openDatabaseAsync('english_words.db');
       await runMigrations(db);
       return db;
     })();
