@@ -9,6 +9,31 @@ export interface ConjugationEntry {
   form: string;
 }
 
+/**
+ * Given any word form (inflected or base), return the base/lemma form.
+ * e.g. "using" → "use", "ran" → "run", "studies" → "study", "mice" → "mouse"
+ */
+export function lemmatize(word: string): string {
+  try {
+    const inflector = new Inflectors(word);
+
+    // Try verb lemmatization: toPresent() returns the base/infinitive form
+    const present = inflector.toPresent?.();
+    if (present && present !== word) {
+      return present;
+    }
+
+    // Try noun singularization for plural forms
+    if (inflector.isPlural?.()) {
+      const singular = inflector.toSingular?.();
+      if (singular && singular !== word) return singular;
+    }
+  } catch {
+    // ignore errors; fall back to original word
+  }
+  return word;
+}
+
 export function generateConjugations(
   word: string,
   partOfSpeech: PartOfSpeech

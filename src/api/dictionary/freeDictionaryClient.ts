@@ -24,6 +24,7 @@ interface DictionaryApiEntry {
 }
 
 export interface DictionaryResult {
+  baseForm: string;
   phonetic: Phonetic | null;
   partOfSpeech: PartOfSpeech;
   exampleSentence?: string;
@@ -45,7 +46,7 @@ export async function lookupWord(word: string): Promise<DictionaryResult> {
   const response = await fetch(url);
 
   if (response.status === 404) {
-    return { phonetic: null, partOfSpeech: 'unknown' };
+    return { baseForm: word, phonetic: null, partOfSpeech: 'unknown' };
   }
   if (!response.ok) {
     throw new Error(`Dictionary API エラー: ${response.status}`);
@@ -53,7 +54,7 @@ export async function lookupWord(word: string): Promise<DictionaryResult> {
 
   const entries: DictionaryApiEntry[] = await response.json();
   const entry = entries[0];
-  if (!entry) return { phonetic: null, partOfSpeech: 'unknown' };
+  if (!entry) return { baseForm: word, phonetic: null, partOfSpeech: 'unknown' };
 
   // Pick best phonetic: prefer one with audio
   const phoneticWithAudio = entry.phonetics.find(p => p.text && p.audio);
@@ -73,5 +74,5 @@ export async function lookupWord(word: string): Promise<DictionaryResult> {
 
   const exampleSentence = firstMeaning?.definitions.find(d => d.example)?.example;
 
-  return { phonetic, partOfSpeech, exampleSentence };
+  return { baseForm: entry.word.toLowerCase(), phonetic, partOfSpeech, exampleSentence };
 }
