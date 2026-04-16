@@ -1,47 +1,38 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { openDatabaseAsync, SQLiteDatabase } from 'expo-sqlite';
+import * as SQLite from 'expo-sqlite/legacy';
+import { Database } from './helpers';
 import { runMigrations } from './migrations';
 
-const DB_NAME = 'english_words.db';
+let initPromise: Promise<Database> | null = null;
 
-let dbInstance: SQLiteDatabase | null = null;
-
-export async function getDatabase(): Promise<SQLiteDatabase> {
-  if (!dbInstance) {
-    dbInstance = await openDatabaseAsync(DB_NAME);
-    await dbInstance.execAsync('PRAGMA foreign_keys = ON;');
-    await runMigrations(dbInstance);
+export function getDatabase(): Promise<Database> {
+  if (!initPromise) {
+    initPromise = (async () => {
+      const db = SQLite.openDatabase('english_words.db');
+      await runMigrations(db);
+      return db;
+    })();
   }
-  return dbInstance;
+  return initPromise;
 }
 
 interface DatabaseContextValue {
-  db: SQLiteDatabase | null;
   isReady: boolean;
 }
 
-const DatabaseContext = createContext<DatabaseContextValue>({
-  db: null,
-  isReady: false,
-});
+const DatabaseContext = createContext<DatabaseContextValue>({ isReady: false });
 
 export function DatabaseProvider({ children }: { children: React.ReactNode }) {
-  const [db, setDb] = useState<SQLiteDatabase | null>(null);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     getDatabase()
-      .then(database => {
-        setDb(database);
-        setIsReady(true);
-      })
-      .catch(err => {
-        console.error('Failed to initialize database:', err);
-      });
+      .then(() => setIsReady(true))
+      .catch(err => console.error('Failed to initialize database:', err));
   }, []);
 
   return (
-    <DatabaseContext.Provider value={{ db, isReady }}>
+    <DatabaseContext.Provider value={{ isReady }}>
       {children}
     </DatabaseContext.Provider>
   );

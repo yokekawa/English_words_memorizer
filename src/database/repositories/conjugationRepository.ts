@@ -1,4 +1,4 @@
-import { SQLiteDatabase } from 'expo-sqlite';
+import { Database, queryAll, execute } from '../helpers';
 import { Conjugation, ConjugationType } from '@/types';
 
 interface ConjugationRow {
@@ -9,12 +9,13 @@ interface ConjugationRow {
 }
 
 export class ConjugationRepository {
-  constructor(private db: SQLiteDatabase) {}
+  constructor(private db: Database) {}
 
   async findByWordId(wordId: number): Promise<Conjugation[]> {
-    const rows = await this.db.getAllAsync<ConjugationRow>(
+    const rows = await queryAll<ConjugationRow>(
+      this.db,
       'SELECT * FROM conjugations WHERE word_id = ?',
-      wordId
+      [wordId]
     );
     return rows.map(r => ({
       id: r.id,
@@ -24,23 +25,15 @@ export class ConjugationRepository {
     }));
   }
 
-  async insert(
-    wordId: number,
-    type: ConjugationType,
-    form: string
-  ): Promise<void> {
-    await this.db.runAsync(
+  async insert(wordId: number, type: ConjugationType, form: string): Promise<void> {
+    await execute(
+      this.db,
       `INSERT OR REPLACE INTO conjugations (word_id, type, form) VALUES (?, ?, ?)`,
-      wordId,
-      type,
-      form
+      [wordId, type, form]
     );
   }
 
   async deleteByWordId(wordId: number): Promise<void> {
-    await this.db.runAsync(
-      'DELETE FROM conjugations WHERE word_id = ?',
-      wordId
-    );
+    await execute(this.db, 'DELETE FROM conjugations WHERE word_id = ?', [wordId]);
   }
 }

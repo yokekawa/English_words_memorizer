@@ -1,24 +1,25 @@
-import { SQLiteDatabase } from 'expo-sqlite';
+import { Database, queryAll, execute, executeMany } from '../helpers';
 import { migrate001 } from './001_initial';
 
-const MIGRATIONS_TABLE = `
+const CREATE_MIGRATIONS_TABLE = `
   CREATE TABLE IF NOT EXISTS migrations (
-    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     version INTEGER NOT NULL UNIQUE,
     applied_at TEXT NOT NULL DEFAULT (datetime('now'))
   )
 `;
 
-type MigrationFn = (db: SQLiteDatabase) => Promise<void>;
+type MigrationFn = (db: Database) => Promise<void>;
 
 const migrations: { version: number; fn: MigrationFn }[] = [
   { version: 1, fn: migrate001 },
 ];
 
-export async function runMigrations(db: SQLiteDatabase): Promise<void> {
-  await db.execAsync(MIGRATIONS_TABLE);
+export async function runMigrations(db: Database): Promise<void> {
+  await executeMany(db, [{ sql: CREATE_MIGRATIONS_TABLE }]);
 
-  const applied = await db.getAllAsync<{ version: number }>(
+  const applied = await queryAll<{ version: number }>(
+    db,
     'SELECT version FROM migrations ORDER BY version ASC'
   );
   const appliedVersions = new Set(applied.map(r => r.version));
@@ -26,10 +27,9 @@ export async function runMigrations(db: SQLiteDatabase): Promise<void> {
   for (const migration of migrations) {
     if (!appliedVersions.has(migration.version)) {
       await migration.fn(db);
-      await db.runAsync(
-        'INSERT INTO migrations (version) VALUES (?)',
-        migration.version
-      );
+      await execute(db, 'INSERT INTO migrations (version) VALUES (?)', [
+        migration.version,
+      ]);
     }
   }
 }
