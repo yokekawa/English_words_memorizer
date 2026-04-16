@@ -48,8 +48,8 @@ export const QUIZ_MODE_CONFIGS: QuizModeConfig[] = [
   },
   {
     mode: 'base_to_comparative',
-    label: '比較級',
-    description: '原級から比較級を入力',
+    label: '比較級・最上級',
+    description: '原級から比較級または最上級を入力',
     icon: '📈',
     color: Colors.quizMode.baseToComparative,
     requiredPartOfSpeech: ['adjective', 'adverb'],

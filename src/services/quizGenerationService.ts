@@ -18,18 +18,36 @@ function buildQuestion(word: Word, mode: QuizMode): QuizQuestion | null {
     };
   }
 
+  if (mode === 'base_to_comparative') {
+    const comparativeConj = word.conjugations.find(c => c.type === 'comparative');
+    const superlativeConj = word.conjugations.find(c => c.type === 'superlative');
+    const available = (
+      [
+        comparativeConj ? { form: comparativeConj.form, prompt: '比較級は？' } : null,
+        superlativeConj ? { form: superlativeConj.form, prompt: '最上級は？' } : null,
+      ].filter(Boolean) as { form: string; prompt: string }[]
+    );
+    if (available.length === 0) return null;
+    const chosen = available[Math.floor(Math.random() * available.length)];
+    return {
+      id: makeId(),
+      wordId: word.id,
+      mode,
+      prompt: `${word.baseForm}  ―  ${chosen.prompt}`,
+      correctAnswer: chosen.form,
+    };
+  }
+
   const conjTypeMap: Record<string, string> = {
     base_to_past: 'past_tense',
     base_to_plural: 'plural',
     base_to_participle: 'present_participle',
-    base_to_comparative: 'comparative',
   };
 
   const promptMap: Record<string, string> = {
     base_to_past: '過去形は？',
     base_to_plural: '複数形は？',
     base_to_participle: '現在分詞形（-ing）は？',
-    base_to_comparative: '比較級は？',
   };
 
   const conjType = conjTypeMap[mode];
@@ -81,7 +99,11 @@ export class QuizGenerationService {
 
     // Filter to words that have required conjugation
     const config = QUIZ_MODE_CONFIGS.find(c => c.mode === mode);
-    if (config?.requiredConjugationType) {
+    if (mode === 'base_to_comparative') {
+      candidates = candidates.filter(w =>
+        w.conjugations.some(c => c.type === 'comparative' || c.type === 'superlative')
+      );
+    } else if (config?.requiredConjugationType) {
       candidates = candidates.filter(w =>
         w.conjugations.some(c => c.type === config.requiredConjugationType)
       );
@@ -122,6 +144,11 @@ export class QuizGenerationService {
         words = await repo.findAll();
     }
 
+    if (mode === 'base_to_comparative') {
+      return words.filter(w =>
+        w.conjugations.some(c => c.type === 'comparative' || c.type === 'superlative')
+      ).length;
+    }
     const config = QUIZ_MODE_CONFIGS.find(c => c.mode === mode);
     if (config?.requiredConjugationType) {
       return words.filter(w =>
