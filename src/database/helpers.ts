@@ -1,4 +1,4 @@
-import * as SQLite from 'expo-sqlite/legacy';
+import * as SQLite from 'expo-sqlite';
 
 export type Database = SQLite.SQLiteDatabase;
 export type SQLArgs = (string | number | null)[];
