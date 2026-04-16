@@ -28,9 +28,9 @@ export async function translateToJapanese(word: string): Promise<string> {
   }
 
   const translated = data.responseData.translatedText;
-  if (!translated || translated === word) {
-    // If translation returned the same word (failed), return placeholder
-    return `(${word})`;
+  const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(translated ?? '');
+  if (!translated || translated === word || !hasJapanese) {
+    throw new Error('No valid Japanese translation');
   }
 
   return translated;

@@ -31,6 +31,15 @@ export function lemmatize(word: string): string {
   // Check irregular adjectives first
   if (IRREGULAR_ADJECTIVES[w]) return IRREGULAR_ADJECTIVES[w];
 
+  // Present participle (-ing): try en-inflectors before compromise
+  // compromise often fails to tag isolated gerunds (e.g. "using" → unchanged)
+  if (w.endsWith('ing') && w.length > 4) {
+    try {
+      const base = new Inflectors(w).toPresent?.();
+      if (base && base !== w) return base;
+    } catch {}
+  }
+
   try {
     const doc = nlp(w);
 

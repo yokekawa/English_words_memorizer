@@ -29,7 +29,7 @@ export class WordRegistrationService {
     const japaneseMeaning =
       japaneseResult.status === 'fulfilled'
         ? japaneseResult.value
-        : `(${baseForm})`;
+        : '(要確認)';
 
     // Step 4: Generate conjugations for the true base form
     const conjugations = generateConjugations(baseForm, dictData.partOfSpeech);
