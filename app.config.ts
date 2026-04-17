@@ -41,5 +41,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ],
   extra: {
     googleVisionApiKey: process.env.GOOGLE_VISION_API_KEY ?? '',
+    eas: {
+      projectId: 'dbaa0d80-2d1e-4ce3-b8fb-8fddf6d1d5d6',
+    },
   },
 });
