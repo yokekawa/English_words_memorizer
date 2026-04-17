@@ -4,13 +4,19 @@ import {
   Text,
   ScrollView,
   StyleSheet,
-  Switch,
   TouchableOpacity,
   TextInput,
   Alert,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { StudyStackParams, QuizMode, WordFilter, PartOfSpeech, SavedRange } from '@/types';
+import {
+  StudyStackParams,
+  QuizMode,
+  WordFilter,
+  PartOfSpeech,
+  SavedRange,
+  Word,
+} from '@/types';
 import { QUIZ_MODE_CONFIGS } from '@/constants/quizModes';
 import { quizGenerationService } from '@/services/quizGenerationService';
 import { useQuizStore } from '@/store/quizStore';
@@ -18,33 +24,39 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useWordStore } from '@/store/wordStore';
 import { getDatabase } from '@/database/db';
 import { SavedRangeRepository } from '@/database/repositories/savedRangeRepository';
-import DateRangePicker from '@/components/study/DateRangePicker';
 import WordCountBadge from '@/components/study/WordCountBadge';
-import WordSelectionModal from '@/components/study/WordSelectionModal';
 import Button from '@/components/common/Button';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants';
 
 type Props = NativeStackScreenProps<StudyStackParams, 'StudyHome'>;
 
-const POS_OPTIONS: { pos: PartOfSpeech; label: string }[] = [
-  { pos: 'noun',         label: '名詞' },
-  { pos: 'verb',         label: '動詞' },
-  { pos: 'adjective',    label: '形容詞' },
-  { pos: 'adverb',       label: '副詞' },
-  { pos: 'pronoun',      label: '代名詞' },
-  { pos: 'preposition',  label: '前置詞' },
-  { pos: 'conjunction',  label: '接続詞' },
-  { pos: 'interjection', label: '感嘆詞' },
-];
+function toIsoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
 
-export default function StudyHomeScreen({ navigation }: Props) {
+function resolveFilterToIds(filter: WordFilter, allWords: Word[]): number[] {
+  if (filter.type === 'word_ids') return filter.ids;
+  let list = allWords;
+  if (filter.type === 'date_range') {
+    const toEnd = filter.to + 'T23:59:59.999Z';
+    list = list.filter(w => w.createdAt >= filter.from && w.createdAt <= toEnd);
+  }
+  if ('pos' in filter && filter.pos && filter.pos.length > 0) {
+    const pos = filter.pos;
+    list = list.filter(w => pos.includes(w.partOfSpeech));
+  }
+  return list.map(w => w.id);
+}
+
+export default function StudyHomeScreen({ navigation, route }: Props) {
   // ── 保存済み範囲 ──
   const [savedRanges, setSavedRanges] = useState<SavedRange[]>([]);
   const [selectedRangeId, setSelectedRangeId] = useState<number | null>(null);
   const [saveFormVisible, setSaveFormVisible] = useState(false);
   const [newRangeName, setNewRangeName] = useState('');
 
-  // ── 出題範囲設定 ──
+  // ── 出題範囲（単語選択 + フィルター状態の保持） ──
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [useDateFilter, setUseDateFilter] = useState(false);
   const [fromDate, setFromDate] = useState<Date>(() => {
     const d = new Date(); d.setDate(d.getDate() - 30); d.setHours(0, 0, 0, 0); return d;
@@ -53,8 +65,6 @@ export default function StudyHomeScreen({ navigation }: Props) {
     const d = new Date(); d.setHours(23, 59, 59, 999); return d;
   });
   const [posFilter, setPosFilter] = useState<PartOfSpeech[]>([]);
-  const [examCustomIds, setExamCustomIds] = useState<Set<number> | null>(null);
-  const [modalVisible, setModalVisible] = useState(false);
 
   // ── 問題モード ──
   const [selectedMode, setSelectedMode] = useState<QuizMode>('jp_to_en');
@@ -67,7 +77,8 @@ export default function StudyHomeScreen({ navigation }: Props) {
   const startSession = useQuizStore(s => s.startSession);
   const defaultWordCount = useSettingsStore(s => s.defaultWordCount);
   const { words: allWords, loadWords } = useWordStore();
-  const loadingRange = useRef(false);
+  const hasInitializedSelection = useRef(false);
+  const isManualChange = useRef(false);
 
   // 初期ロード
   useEffect(() => {
@@ -79,19 +90,39 @@ export default function StudyHomeScreen({ navigation }: Props) {
     })();
   }, []);
 
-  // 現在のフィルター
-  const filter: WordFilter = useMemo(() => {
-    if (examCustomIds !== null) return { type: 'word_ids', ids: [...examCustomIds] };
-    if (useDateFilter) {
-      const base = {
-        type: 'date_range' as const,
-        from: fromDate.toISOString().slice(0, 10),
-        to: toDate.toISOString().slice(0, 10),
-      };
-      return posFilter.length > 0 ? { ...base, pos: posFilter } : base;
-    }
-    return posFilter.length > 0 ? { type: 'all' as const, pos: posFilter } : { type: 'all' as const };
-  }, [examCustomIds, useDateFilter, fromDate, toDate, posFilter]);
+  // 初回: 全単語を選択状態に
+  useEffect(() => {
+    if (hasInitializedSelection.current) return;
+    if (allWords.length === 0) return;
+    setSelectedIds(new Set(allWords.map(w => w.id)));
+    hasInitializedSelection.current = true;
+  }, [allWords]);
+
+  // WordSelectionScreen からの戻り値を反映
+  useEffect(() => {
+    const result = route.params?.result;
+    if (!result) return;
+    isManualChange.current = true;
+    setSelectedIds(new Set(result.selectedIds));
+    setUseDateFilter(result.useDateFilter);
+    setFromDate(new Date(result.fromIso));
+    setToDate(new Date(result.toIso));
+    setPosFilter(result.posFilter);
+    navigation.setParams({ result: undefined });
+    setTimeout(() => { isManualChange.current = false; }, 50);
+  }, [route.params?.result]);
+
+  // 選択が手動変更されたら保存済み範囲の選択を解除
+  useEffect(() => {
+    if (isManualChange.current) return;
+    setSelectedRangeId(null);
+  }, [selectedIds]);
+
+  // クイズ用フィルター（常に word_ids）
+  const filter: WordFilter = useMemo(
+    () => ({ type: 'word_ids', ids: [...selectedIds] }),
+    [selectedIds]
+  );
 
   // 出題可能数を更新
   useEffect(() => {
@@ -103,42 +134,26 @@ export default function StudyHomeScreen({ navigation }: Props) {
     return () => { cancelled = true; };
   }, [selectedMode, filter]);
 
-  // 範囲設定が手動変更されたら選択解除
-  useEffect(() => {
-    if (loadingRange.current) return;
-    setSelectedRangeId(null);
-  }, [useDateFilter, fromDate, toDate, posFilter, examCustomIds]);
-
-  // モーダルの初期選択（期間内の単語）
-  const initialModalSelection = useMemo<Set<number>>(() => {
-    if (!useDateFilter && examCustomIds === null) return new Set(allWords.map(w => w.id));
-    if (examCustomIds !== null) return examCustomIds;
-    const from = fromDate.toISOString().slice(0, 10);
-    const to = toDate.toISOString().slice(0, 10);
-    return new Set(allWords.filter(w => w.createdAt >= from && w.createdAt <= to + 'T23:59:59.999Z').map(w => w.id));
-  }, [useDateFilter, examCustomIds, fromDate, toDate, allWords]);
-
   // 保存済み範囲を読み込む
   const loadSavedRange = (range: SavedRange) => {
-    loadingRange.current = true;
+    isManualChange.current = true;
     setSelectedRangeId(range.id);
     const f = range.filter;
-    if (f.type === 'word_ids') {
-      setExamCustomIds(new Set(f.ids));
-      setUseDateFilter(false);
-      setPosFilter([]);
-    } else if (f.type === 'date_range') {
+    const ids = resolveFilterToIds(f, allWords);
+    setSelectedIds(new Set(ids));
+
+    if (f.type === 'date_range') {
       setUseDateFilter(true);
       setFromDate(new Date(f.from));
       setToDate(new Date(f.to));
       setPosFilter(f.pos ?? []);
-      setExamCustomIds(null);
+    } else if (f.type === 'word_ids') {
+      // フィルタ状態はそのまま（ユーザーが再編集するときに最後の状態を維持）
     } else {
       setUseDateFilter(false);
       setPosFilter('pos' in f ? (f.pos ?? []) : []);
-      setExamCustomIds(null);
     }
-    setTimeout(() => { loadingRange.current = false; }, 50);
+    setTimeout(() => { isManualChange.current = false; }, 50);
   };
 
   const handleDeleteRange = (range: SavedRange) => {
@@ -162,9 +177,9 @@ export default function StudyHomeScreen({ navigation }: Props) {
     const db = await getDatabase();
     const saved = await new SavedRangeRepository(db).insert(name, filter);
     setSavedRanges(prev => [saved, ...prev]);
-    loadingRange.current = true;
+    isManualChange.current = true;
     setSelectedRangeId(saved.id);
-    setTimeout(() => { loadingRange.current = false; }, 50);
+    setTimeout(() => { isManualChange.current = false; }, 50);
     setSaveFormVisible(false);
     setNewRangeName('');
   };
@@ -178,17 +193,21 @@ export default function StudyHomeScreen({ navigation }: Props) {
     setIsStarting(false);
   };
 
-  const togglePosFilter = (pos: PartOfSpeech) => {
-    setPosFilter(prev => prev.includes(pos) ? prev.filter(p => p !== pos) : [...prev, pos]);
+  const openWordSelection = () => {
+    navigation.navigate('WordSelection', {
+      initialSelectedIds: [...selectedIds],
+      initialUseDateFilter: useDateFilter,
+      initialFromIso: toIsoDate(fromDate),
+      initialToIso: toIsoDate(toDate),
+      initialPosFilter: posFilter,
+    });
   };
 
-  const activePosOptions = POS_OPTIONS.filter(opt => allWords.some(w => w.partOfSpeech === opt.pos));
-
-  const selectionStatus = examCustomIds !== null
-    ? `${examCustomIds.size}語（手動選択）`
-    : useDateFilter
-      ? '期間内の全単語'
-      : '全登録単語';
+  const selectionStatus = useMemo(() => {
+    if (allWords.length === 0) return '登録単語がありません';
+    if (selectedIds.size === allWords.length) return `全${allWords.length}語`;
+    return `${selectedIds.size} / ${allWords.length} 語`;
+  }, [selectedIds, allWords]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -218,60 +237,14 @@ export default function StudyHomeScreen({ navigation }: Props) {
           </View>
         )}
 
-        {/* 期間指定 */}
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>📅 期間を指定</Text>
-          <Switch
-            value={useDateFilter}
-            onValueChange={v => { setUseDateFilter(v); setExamCustomIds(null); }}
-            trackColor={{ false: Colors.border, true: Colors.primary }}
-            thumbColor={Colors.surface}
-          />
-        </View>
-        {useDateFilter && (
-          <DateRangePicker
-            fromDate={fromDate} toDate={toDate}
-            onFromDateChange={setFromDate} onToDateChange={setToDate}
-          />
-        )}
-
-        {/* 品詞フィルター */}
-        {activePosOptions.length > 0 && (
-          <View style={styles.posSection}>
-            <Text style={styles.fieldLabel}>品詞で絞り込み</Text>
-            <View style={styles.chipsRow}>
-              <TouchableOpacity
-                style={[styles.chip, posFilter.length === 0 && styles.chipActive]}
-                onPress={() => setPosFilter([])}
-              >
-                <Text style={[styles.chipText, posFilter.length === 0 && styles.chipTextActive]}>すべて</Text>
-              </TouchableOpacity>
-              {activePosOptions.map(({ pos, label }) => {
-                const active = posFilter.includes(pos);
-                return (
-                  <TouchableOpacity
-                    key={pos}
-                    style={[styles.chip, active && styles.chipActive]}
-                    onPress={() => togglePosFilter(pos)}
-                  >
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+        {/* 単語選択ボタン（メイン動線） */}
+        <TouchableOpacity style={styles.selectMainBtn} onPress={openWordSelection} activeOpacity={0.8}>
+          <View style={styles.selectMainLeft}>
+            <Text style={styles.selectMainTitle}>単語を選ぶ</Text>
+            <Text style={styles.selectMainSub}>{selectionStatus}</Text>
           </View>
-        )}
-
-        {/* 単語選択ボタン */}
-        <View style={styles.selectRow}>
-          <View>
-            <Text style={styles.fieldLabel}>対象単語</Text>
-            <Text style={styles.selectionStatus}>{selectionStatus}</Text>
-          </View>
-          <TouchableOpacity style={styles.selectBtn} onPress={() => setModalVisible(true)}>
-            <Text style={styles.selectBtnText}>単語を選ぶ ›</Text>
-          </TouchableOpacity>
-        </View>
+          <Text style={styles.selectMainArrow}>›</Text>
+        </TouchableOpacity>
 
         {/* 出題可能数 + 保存 */}
         <View style={styles.countAndSaveRow}>
@@ -348,15 +321,6 @@ export default function StudyHomeScreen({ navigation }: Props) {
         loading={isStarting}
         size="lg"
       />
-
-      {/* 単語選択モーダル */}
-      <WordSelectionModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        onConfirm={ids => { setExamCustomIds(ids); setModalVisible(false); }}
-        allWords={allWords}
-        initialSelectedIds={initialModalSelection}
-      />
     </ScrollView>
   );
 }
@@ -388,31 +352,19 @@ const styles = StyleSheet.create({
   savedChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   savedChipText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.medium },
   savedChipTextActive: { color: Colors.textOnPrimary },
-  switchRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  selectMainBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
   },
-  switchLabel: { fontSize: FontSize.md, color: Colors.text, fontWeight: FontWeight.medium },
-  posSection: { gap: 6 },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
-  chip: {
-    paddingHorizontal: Spacing.sm, paddingVertical: 5,
-    borderRadius: BorderRadius.full, borderWidth: 1.5,
-    borderColor: Colors.border, backgroundColor: Colors.surface,
-  },
-  chipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  chipText: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
-  chipTextActive: { color: Colors.textOnPrimary },
-  selectRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: Colors.surfaceSecondary,
-    borderRadius: BorderRadius.md, padding: Spacing.sm,
-  },
-  selectionStatus: { fontSize: FontSize.sm, color: Colors.text, fontWeight: FontWeight.medium, marginTop: 2 },
-  selectBtn: {
-    paddingHorizontal: Spacing.sm, paddingVertical: 6,
-    backgroundColor: Colors.primary, borderRadius: BorderRadius.sm,
-  },
-  selectBtnText: { fontSize: FontSize.sm, color: Colors.textOnPrimary, fontWeight: FontWeight.semibold },
+  selectMainLeft: { gap: 2 },
+  selectMainTitle: { fontSize: FontSize.md, color: Colors.textOnPrimary, fontWeight: FontWeight.bold },
+  selectMainSub: { fontSize: FontSize.sm, color: Colors.textOnPrimary, opacity: 0.9 },
+  selectMainArrow: { fontSize: 24, color: Colors.textOnPrimary, fontWeight: FontWeight.bold },
   countAndSaveRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   countRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   countLabel: { fontSize: FontSize.sm, color: Colors.textSecondary },

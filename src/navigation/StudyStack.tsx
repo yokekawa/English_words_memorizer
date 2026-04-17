@@ -2,6 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StudyStackParams } from '@/types';
 import StudyHomeScreen from '@/screens/study/StudyHomeScreen';
+import WordSelectionScreen from '@/screens/study/WordSelectionScreen';
 import QuizScreen from '@/screens/study/QuizScreen';
 import ResultScreen from '@/screens/study/ResultScreen';
 import { Colors } from '@/constants';
@@ -21,6 +22,11 @@ export default function StudyStack() {
         name="StudyHome"
         component={StudyHomeScreen}
         options={{ title: '学習モード' }}
+      />
+      <Stack.Screen
+        name="WordSelection"
+        component={WordSelectionScreen}
+        options={{ title: '出題する単語を選ぶ' }}
       />
       <Stack.Screen
         name="Quiz"

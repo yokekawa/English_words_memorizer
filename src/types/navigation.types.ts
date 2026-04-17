@@ -1,5 +1,5 @@
 import { QuizMode, WordFilter } from './quiz.types';
-import { WordDraft } from './word.types';
+import { WordDraft, PartOfSpeech } from './word.types';
 
 export type RegistrationStackParams = {
   Camera: undefined;
@@ -7,8 +7,23 @@ export type RegistrationStackParams = {
   WordDetail: { wordDraft: WordDraft };
 };
 
+export interface WordSelectionResult {
+  selectedIds: number[];
+  useDateFilter: boolean;
+  fromIso: string;
+  toIso: string;
+  posFilter: PartOfSpeech[];
+}
+
 export type StudyStackParams = {
-  StudyHome: undefined;
+  StudyHome: { result?: WordSelectionResult } | undefined;
+  WordSelection: {
+    initialSelectedIds: number[];
+    initialUseDateFilter: boolean;
+    initialFromIso: string;
+    initialToIso: string;
+    initialPosFilter: PartOfSpeech[];
+  };
   Quiz: { sessionId: string };
   Result: { sessionId: string };
 };
