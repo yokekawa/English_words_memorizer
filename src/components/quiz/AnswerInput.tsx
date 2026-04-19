@@ -38,7 +38,7 @@ export default function AnswerInput({
                 isActive && styles.cellActive,
               ]}
             >
-              <Text style={styles.cellText}>{char.toUpperCase()}</Text>
+              <Text style={styles.cellText}>{char}</Text>
             </View>
           );
         })}
