@@ -38,6 +38,7 @@ export type RootTabParams = {
   Study: undefined;
   WordList: undefined;
   Settings: undefined;
+  Help: undefined;
 };
 
 export interface TextBlock {

@@ -1,5 +1,6 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Audio } from 'expo-av';
 import { QuizMode } from '@/types';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants';
 import { getQuizModeConfig } from '@/constants/quizModes';
@@ -9,6 +10,7 @@ interface QuizQuestionProps {
   mode: QuizMode;
   questionNumber: number;
   totalQuestions: number;
+  audioUrl?: string;
 }
 
 export default function QuizQuestion({
@@ -16,8 +18,51 @@ export default function QuizQuestion({
   mode,
   questionNumber,
   totalQuestions,
+  audioUrl,
 }: QuizQuestionProps) {
   const config = getQuizModeConfig(mode);
+  const soundRef = useRef<Audio.Sound | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!audioUrl) return;
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync().catch(() => {});
+        soundRef.current = null;
+      }
+      try {
+        const { sound } = await Audio.Sound.createAsync({ uri: audioUrl });
+        if (cancelled) {
+          await sound.unloadAsync().catch(() => {});
+          return;
+        }
+        soundRef.current = sound;
+        await sound.playAsync();
+      } catch {
+        // Audio unavailable — silently skip
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (soundRef.current) {
+        soundRef.current.unloadAsync().catch(() => {});
+        soundRef.current = null;
+      }
+    };
+  }, [audioUrl]);
+
+  const replayAudio = async () => {
+    if (!soundRef.current) return;
+    try {
+      await soundRef.current.setPositionAsync(0);
+      await soundRef.current.playAsync();
+    } catch {
+      // ignore
+    }
+  };
+
+  const isAudio = mode === 'audio_to_en';
 
   return (
     <View style={styles.container}>
@@ -32,6 +77,12 @@ export default function QuizQuestion({
 
       <View style={styles.promptBox}>
         <Text style={styles.promptLabel}>問題</Text>
+        {isAudio && audioUrl && (
+          <TouchableOpacity style={styles.playButton} onPress={replayAudio} activeOpacity={0.7}>
+            <Text style={styles.playIcon}>▶</Text>
+            <Text style={styles.playLabel}>もう一度再生</Text>
+          </TouchableOpacity>
+        )}
         <Text style={styles.prompt}>{prompt}</Text>
       </View>
 
@@ -89,6 +140,21 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.bold,
     color: Colors.text,
     textAlign: 'center',
+  },
+  playButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.full,
+  },
+  playIcon: { color: Colors.textOnPrimary, fontSize: FontSize.md },
+  playLabel: {
+    color: Colors.textOnPrimary,
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
   },
   instruction: {
     fontSize: FontSize.sm,

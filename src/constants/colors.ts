@@ -33,9 +33,9 @@ export const Colors = {
 
   quizMode: {
     jpToEn: '#6366f1',
+    audioToEn: '#0ea5e9',
     baseToPast: '#f59e0b',
     baseToPlural: '#10b981',
-    baseToParticiple: '#ec4899',
     baseToComparative: '#8b5cf6',
   },
 } as const;

@@ -59,6 +59,8 @@ export default function ResultScreen({ navigation }: Props) {
       ? `試験対策: ${result.filter.from} 〜 ${result.filter.to}`
       : result.filter.type === 'recent'
       ? `直近${result.filter.days}日`
+      : result.filter.type === 'word_ids'
+      ? `${result.filter.ids.length}語`
       : '全単語';
 
   const handleRetry = async () => {
@@ -116,11 +118,20 @@ export default function ResultScreen({ navigation }: Props) {
           <View style={styles.resultInfo}>
             <Text style={styles.resultPrompt} numberOfLines={1}>{r.prompt}</Text>
             {!r.isCorrect && (
-              <View style={styles.answerRow}>
-                <Text style={styles.wrongAnswer}>{r.userAnswer || '(未回答)'}</Text>
-                <Text style={styles.arrow}> → </Text>
-                <Text style={styles.correctAnswer}>{r.correctAnswer}</Text>
-              </View>
+              <>
+                <View style={styles.answerRow}>
+                  <Text style={styles.wrongAnswer}>{r.userAnswer || '(未回答)'}</Text>
+                  <Text style={styles.arrow}> → </Text>
+                  <Text style={styles.correctAnswer}>{r.correctAnswer}</Text>
+                </View>
+                {r.correctAnswer2 && (
+                  <View style={styles.answerRow}>
+                    <Text style={styles.wrongAnswer}>{r.userAnswer2 || '(未回答)'}</Text>
+                    <Text style={styles.arrow}> → </Text>
+                    <Text style={styles.correctAnswer}>{r.correctAnswer2}</Text>
+                  </View>
+                )}
+              </>
             )}
           </View>
         </View>

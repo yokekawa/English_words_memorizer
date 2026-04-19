@@ -1,66 +1,133 @@
 import { WordRepository } from '@/database/repositories/wordRepository';
 import { getDatabase } from '@/database/db';
 import { QuizMode, QuizQuestion, QuizSession, WordFilter, Word } from '@/types';
-import { QUIZ_MODE_CONFIGS } from '@/constants/quizModes';
+import { getQuizModeConfig } from '@/constants/quizModes';
 
 function makeId(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+function findConj(word: Word, type: string): string | undefined {
+  return word.conjugations.find(c => c.type === type)?.form;
+}
+
 function buildQuestion(word: Word, mode: QuizMode): QuizQuestion | null {
-  if (mode === 'jp_to_en') {
-    return {
-      id: makeId(),
-      wordId: word.id,
-      mode,
-      prompt: word.japaneseMeaning,
-      correctAnswer: word.baseForm,
-    };
+  switch (mode) {
+    case 'jp_to_en':
+      return {
+        id: makeId(),
+        wordId: word.id,
+        mode,
+        prompt: word.japaneseMeaning,
+        correctAnswer: word.baseForm,
+      };
+
+    case 'audio_to_en': {
+      const phoneticText = word.phonetic?.text ?? '';
+      const audioUrl = word.phonetic?.audioUrl;
+      if (!phoneticText && !audioUrl) return null;
+      return {
+        id: makeId(),
+        wordId: word.id,
+        mode,
+        prompt: phoneticText || '(音声のみ)',
+        correctAnswer: word.baseForm,
+        audioUrl,
+      };
+    }
+
+    case 'base_to_past': {
+      const past = findConj(word, 'past_tense');
+      if (!past) return null;
+      return {
+        id: makeId(),
+        wordId: word.id,
+        mode,
+        prompt: `${word.baseForm}  ―  過去形は？`,
+        correctAnswer: past,
+      };
+    }
+
+    case 'base_to_past_participle': {
+      const pp = findConj(word, 'past_participle');
+      if (!pp) return null;
+      return {
+        id: makeId(),
+        wordId: word.id,
+        mode,
+        prompt: `${word.baseForm}  ―  過去分詞形は？`,
+        correctAnswer: pp,
+      };
+    }
+
+    case 'base_to_past_both': {
+      const past = findConj(word, 'past_tense');
+      const pp = findConj(word, 'past_participle');
+      if (!past || !pp) return null;
+      return {
+        id: makeId(),
+        wordId: word.id,
+        mode,
+        prompt: `${word.baseForm}  ―  過去形と過去分詞形は？`,
+        correctAnswer: past,
+        correctAnswer2: pp,
+        label1: '過去形',
+        label2: '過去分詞形',
+      };
+    }
+
+    case 'base_to_plural': {
+      const pl = findConj(word, 'plural');
+      if (!pl) return null;
+      return {
+        id: makeId(),
+        wordId: word.id,
+        mode,
+        prompt: `${word.baseForm}  ―  複数形は？`,
+        correctAnswer: pl,
+      };
+    }
+
+    case 'base_to_comparative': {
+      const c = findConj(word, 'comparative');
+      if (!c) return null;
+      return {
+        id: makeId(),
+        wordId: word.id,
+        mode,
+        prompt: `${word.baseForm}  ―  比較級は？`,
+        correctAnswer: c,
+      };
+    }
+
+    case 'base_to_superlative': {
+      const s = findConj(word, 'superlative');
+      if (!s) return null;
+      return {
+        id: makeId(),
+        wordId: word.id,
+        mode,
+        prompt: `${word.baseForm}  ―  最上級は？`,
+        correctAnswer: s,
+      };
+    }
+
+    case 'base_to_comparative_both': {
+      const c = findConj(word, 'comparative');
+      const s = findConj(word, 'superlative');
+      if (!c || !s) return null;
+      return {
+        id: makeId(),
+        wordId: word.id,
+        mode,
+        prompt: `${word.baseForm}  ―  比較級と最上級は？`,
+        correctAnswer: c,
+        correctAnswer2: s,
+        label1: '比較級',
+        label2: '最上級',
+      };
+    }
   }
-
-  if (mode === 'base_to_comparative') {
-    const comparativeConj = word.conjugations.find(c => c.type === 'comparative');
-    const superlativeConj = word.conjugations.find(c => c.type === 'superlative');
-    const available = (
-      [
-        comparativeConj ? { form: comparativeConj.form, prompt: '比較級は？' } : null,
-        superlativeConj ? { form: superlativeConj.form, prompt: '最上級は？' } : null,
-      ].filter(Boolean) as { form: string; prompt: string }[]
-    );
-    if (available.length === 0) return null;
-    const chosen = available[Math.floor(Math.random() * available.length)];
-    return {
-      id: makeId(),
-      wordId: word.id,
-      mode,
-      prompt: `${word.baseForm}  ―  ${chosen.prompt}`,
-      correctAnswer: chosen.form,
-    };
-  }
-
-  const conjTypeMap: Record<string, string> = {
-    base_to_past: 'past_tense',
-    base_to_plural: 'plural',
-    base_to_participle: 'present_participle',
-  };
-
-  const promptMap: Record<string, string> = {
-    base_to_past: '過去形は？',
-    base_to_plural: '複数形は？',
-    base_to_participle: '現在分詞形（-ing）は？',
-  };
-
-  const conjType = conjTypeMap[mode];
-  const conj = word.conjugations.find(c => c.type === conjType);
-  if (!conj) return null;
-
-  return {
-    id: makeId(),
-    wordId: word.id,
-    mode,
-    prompt: `${word.baseForm}  ―  ${promptMap[mode]}`,
-    correctAnswer: conj.form,
-  };
 }
 
 function weightedShuffle(words: Word[]): Word[] {
@@ -100,18 +167,14 @@ async function loadCandidates(repo: WordRepository, filter: WordFilter): Promise
 }
 
 function applyModeFilter(words: Word[], mode: QuizMode): Word[] {
-  if (mode === 'base_to_comparative') {
-    return words.filter(w =>
-      w.conjugations.some(c => c.type === 'comparative' || c.type === 'superlative')
-    );
+  if (mode === 'jp_to_en') return words;
+  if (mode === 'audio_to_en') {
+    return words.filter(w => (w.phonetic?.text || w.phonetic?.audioUrl));
   }
-  const config = QUIZ_MODE_CONFIGS.find(c => c.mode === mode);
-  if (config?.requiredConjugationType) {
-    return words.filter(w =>
-      w.conjugations.some(c => c.type === config.requiredConjugationType)
-    );
-  }
-  return words;
+  const config = getQuizModeConfig(mode);
+  const required = config.requiredConjugationTypes ?? [];
+  if (required.length === 0) return words;
+  return words.filter(w => required.every(t => w.conjugations.some(c => c.type === t)));
 }
 
 export class QuizGenerationService {

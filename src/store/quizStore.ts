@@ -19,7 +19,7 @@ interface QuizState {
   isLoading: boolean;
   error: string | null;
   startSession: (mode: QuizMode, filter: WordFilter, wordCount?: number) => Promise<void>;
-  submitAnswer: (userAnswer: string) => Promise<QuizAttempt | null>;
+  submitAnswer: (userAnswer: string, userAnswer2?: string) => Promise<QuizAttempt | null>;
   nextQuestion: () => void;
   endSession: () => Promise<QuizResult | null>;
   clearSession: () => void;
@@ -42,19 +42,24 @@ export const useQuizStore = create<QuizState>((set, get) => ({
     }
   },
 
-  submitAnswer: async (userAnswer: string) => {
+  submitAnswer: async (userAnswer: string, userAnswer2?: string) => {
     const { session, currentIndex, questionStartTime } = get();
     if (!session) return null;
     const question = session.questions[currentIndex];
     if (!question) return null;
 
-    const isCorrect = evaluateAnswer(userAnswer, question.correctAnswer);
+    const correct1 = evaluateAnswer(userAnswer, question.correctAnswer);
+    const correct2 = question.correctAnswer2
+      ? evaluateAnswer(userAnswer2 ?? '', question.correctAnswer2)
+      : true;
+    const isCorrect = correct1 && correct2;
     const timeSpentMs = Date.now() - questionStartTime;
 
     const attempt: QuizAttempt = {
       questionId: question.id,
       wordId: question.wordId,
       userAnswer,
+      userAnswer2: question.correctAnswer2 ? (userAnswer2 ?? '') : undefined,
       isCorrect,
       timeSpentMs,
     };

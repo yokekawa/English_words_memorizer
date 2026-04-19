@@ -45,12 +45,14 @@ export function buildResult(session: QuizSession): QuizResult {
     return {
       wordId: attempt.wordId,
       baseForm:
-        question.mode === 'jp_to_en'
+        question.mode === 'jp_to_en' || question.mode === 'audio_to_en'
           ? question.correctAnswer
           : question.prompt.split('  ―  ')[0].trim(),
       prompt: question.prompt,
       correctAnswer: question.correctAnswer,
+      correctAnswer2: question.correctAnswer2,
       userAnswer: attempt.userAnswer,
+      userAnswer2: attempt.userAnswer2,
       isCorrect: attempt.isCorrect,
     };
   });

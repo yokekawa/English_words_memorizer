@@ -22,7 +22,9 @@ const FEEDBACK_DELAY_MS = 1500;
 const MAX_WRONG_ATTEMPTS = 5;
 
 export default function QuizScreen({ navigation }: Props) {
-  const [input, setInput] = useState('');
+  const [input1, setInput1] = useState('');
+  const [input2, setInput2] = useState('');
+  const [activeField, setActiveField] = useState<0 | 1>(0);
   const [feedbackState, setFeedbackState] = useState<boolean | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [wrongAttempts, setWrongAttempts] = useState(0);
@@ -42,6 +44,15 @@ export default function QuizScreen({ navigation }: Props) {
     }
   }, []);
 
+  // Reset input state when moving to a new question
+  useEffect(() => {
+    setInput1('');
+    setInput2('');
+    setActiveField(0);
+    setWrongAttempts(0);
+    setFeedbackState(null);
+  }, [currentIndex]);
+
   if (!session) return null;
 
   const currentQuestion = session.questions[currentIndex];
@@ -49,11 +60,17 @@ export default function QuizScreen({ navigation }: Props) {
 
   if (!currentQuestion) return null;
 
-  const doSubmit = async (answer: string) => {
+  const isDual = currentQuestion.correctAnswer2 !== undefined;
+  const currentAnswer = activeField === 0
+    ? currentQuestion.correctAnswer
+    : (currentQuestion.correctAnswer2 ?? '');
+  const currentInput = activeField === 0 ? input1 : input2;
+
+  const doSubmit = async (ans1: string, ans2: string) => {
     if (isSubmitting || feedbackState !== null) return;
     setIsSubmitting(true);
 
-    const attempt = await submitAnswer(answer);
+    const attempt = await submitAnswer(ans1, isDual ? ans2 : undefined);
     if (!attempt) {
       setIsSubmitting(false);
       return;
@@ -69,9 +86,6 @@ export default function QuizScreen({ navigation }: Props) {
     }
 
     setTimeout(async () => {
-      setFeedbackState(null);
-      setInput('');
-      setWrongAttempts(0);
       setIsSubmitting(false);
 
       const nextIdx = currentIndex + 1;
@@ -89,31 +103,53 @@ export default function QuizScreen({ navigation }: Props) {
   const handleKeyPress = (key: string) => {
     if (feedbackState !== null || isSubmitting) return;
 
-    const expectedChar = currentQuestion.correctAnswer[input.length];
+    const expectedChar = currentAnswer[currentInput.length];
     if (!expectedChar) return;
 
     if (key.toLowerCase() === expectedChar.toLowerCase()) {
-      // Correct key: accept it
-      const newInput = input + key.toLowerCase();
-      setInput(newInput);
-      if (newInput.length === currentQuestion.correctAnswer.length) {
-        // Answer complete: auto-submit
-        doSubmit(newInput);
+      const newInput = currentInput + key.toLowerCase();
+      if (activeField === 0) {
+        setInput1(newInput);
+      } else {
+        setInput2(newInput);
+      }
+
+      if (newInput.length === currentAnswer.length) {
+        if (activeField === 0 && isDual) {
+          // Move to second field
+          setActiveField(1);
+          setWrongAttempts(0);
+        } else {
+          // All fields complete — submit
+          const finalAns1 = activeField === 0 ? newInput : input1;
+          const finalAns2 = activeField === 1 ? newInput : input2;
+          doSubmit(finalAns1, finalAns2);
+        }
       }
     } else {
-      // Wrong key: count as miss, don't accept
       const newWrongCount = wrongAttempts + 1;
       if (hapticEnabled) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       }
       if (newWrongCount >= MAX_WRONG_ATTEMPTS) {
-        // Too many misses: force incorrect
-        doSubmit('');
+        if (activeField === 0 && isDual) {
+          // Give up on field 1, move to field 2 with empty input
+          setActiveField(1);
+          setWrongAttempts(0);
+        } else {
+          // Submit with whatever we have (current field forced empty)
+          const finalAns1 = activeField === 0 ? '' : input1;
+          const finalAns2 = activeField === 1 ? '' : input2;
+          doSubmit(finalAns1, finalAns2);
+        }
       } else {
         setWrongAttempts(newWrongCount);
       }
     }
   };
+
+  const primaryAnswerLength = currentQuestion.correctAnswer.length;
+  const secondaryAnswerLength = (currentQuestion.correctAnswer2 ?? '').length;
 
   return (
     <View
@@ -134,6 +170,7 @@ export default function QuizScreen({ navigation }: Props) {
         mode={currentQuestion.mode}
         questionNumber={currentIndex + 1}
         totalQuestions={session.questions.length}
+        audioUrl={currentQuestion.audioUrl}
       />
 
       {wrongAttempts > 0 && feedbackState === null && (
@@ -146,13 +183,27 @@ export default function QuizScreen({ navigation }: Props) {
 
       <View style={styles.inputContainer}>
         <AnswerInput
-          value={input}
-          maxLength={Math.max(currentQuestion.correctAnswer.length + 2, 8)}
+          value={input1}
+          maxLength={Math.max(primaryAnswerLength + 2, 8)}
           isCorrect={feedbackState}
           correctAnswer={
             feedbackState === false ? currentQuestion.correctAnswer : undefined
           }
+          label={isDual ? currentQuestion.label1 : undefined}
+          active={activeField === 0}
         />
+        {isDual && (
+          <AnswerInput
+            value={input2}
+            maxLength={Math.max(secondaryAnswerLength + 2, 8)}
+            isCorrect={feedbackState}
+            correctAnswer={
+              feedbackState === false ? currentQuestion.correctAnswer2 : undefined
+            }
+            label={currentQuestion.label2}
+            active={activeField === 1}
+          />
+        )}
       </View>
 
       <VirtualKeyboard
@@ -179,6 +230,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 16,
+    gap: Spacing.md,
   },
   wrongBar: {
     alignItems: 'center',

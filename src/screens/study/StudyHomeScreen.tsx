@@ -17,7 +17,7 @@ import {
   SavedRange,
   Word,
 } from '@/types';
-import { QUIZ_MODE_CONFIGS } from '@/constants/quizModes';
+import { QUIZ_MODE_GROUPS, getGroupKeyForMode } from '@/constants/quizModes';
 import { quizGenerationService } from '@/services/quizGenerationService';
 import { useQuizStore } from '@/store/quizStore';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -287,27 +287,65 @@ export default function StudyHomeScreen({ navigation, route }: Props) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>🎯 問題モードを選択</Text>
         <View style={styles.modeGrid}>
-          {QUIZ_MODE_CONFIGS.map(config => (
-            <TouchableOpacity
-              key={config.mode}
-              style={[
-                styles.modeCard,
-                selectedMode === config.mode && {
-                  borderColor: config.color,
-                  backgroundColor: config.color + '18',
-                },
-              ]}
-              onPress={() => setSelectedMode(config.mode)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.modeIcon}>{config.icon}</Text>
-              <Text style={[styles.modeLabel, selectedMode === config.mode && { color: config.color }]}>
-                {config.label}
-              </Text>
-              <Text style={styles.modeDesc}>{config.description}</Text>
-            </TouchableOpacity>
-          ))}
+          {QUIZ_MODE_GROUPS.map(group => {
+            const isActiveGroup = getGroupKeyForMode(selectedMode) === group.key;
+            return (
+              <TouchableOpacity
+                key={group.key}
+                style={[
+                  styles.modeCard,
+                  isActiveGroup && {
+                    borderColor: group.color,
+                    backgroundColor: group.color + '18',
+                  },
+                ]}
+                onPress={() => setSelectedMode(group.modes[0].mode)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modeIcon}>{group.icon}</Text>
+                <Text style={[styles.modeLabel, isActiveGroup && { color: group.color }]}>
+                  {group.label}
+                </Text>
+                <Text style={styles.modeDesc}>{group.description}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
+
+        {/* Sub-option chips for the currently active group (only if >1 option) */}
+        {(() => {
+          const activeGroup = QUIZ_MODE_GROUPS.find(
+            g => g.key === getGroupKeyForMode(selectedMode)
+          );
+          if (!activeGroup || activeGroup.modes.length <= 1) return null;
+          return (
+            <View style={styles.subOptions}>
+              <Text style={styles.subLabel}>出題する形</Text>
+              <View style={styles.subChipsRow}>
+                {activeGroup.modes.map(opt => {
+                  const active = selectedMode === opt.mode;
+                  return (
+                    <TouchableOpacity
+                      key={opt.mode}
+                      style={[
+                        styles.subChip,
+                        active && {
+                          backgroundColor: activeGroup.color,
+                          borderColor: activeGroup.color,
+                        },
+                      ]}
+                      onPress={() => setSelectedMode(opt.mode)}
+                    >
+                      <Text style={[styles.subChipText, active && styles.subChipTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          );
+        })()}
       </View>
 
       {/* ── 学習開始 ── */}
@@ -390,5 +428,15 @@ const styles = StyleSheet.create({
   modeIcon: { fontSize: 24 },
   modeLabel: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
   modeDesc: { fontSize: FontSize.xs, color: Colors.textSecondary, lineHeight: 16 },
+  subOptions: { gap: 6 },
+  subLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.medium, color: Colors.textSecondary },
+  subChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
+  subChip: {
+    paddingHorizontal: Spacing.sm, paddingVertical: 5,
+    borderRadius: BorderRadius.full, borderWidth: 1.5,
+    borderColor: Colors.border, backgroundColor: Colors.surface,
+  },
+  subChipText: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
+  subChipTextActive: { color: Colors.textOnPrimary },
   noWordHint: { fontSize: FontSize.sm, color: Colors.error, textAlign: 'center' },
 });

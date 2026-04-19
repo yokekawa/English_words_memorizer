@@ -7,6 +7,9 @@ interface AnswerInputProps {
   maxLength?: number;
   isCorrect?: boolean | null;
   correctAnswer?: string;
+  label?: string;
+  /** Whether this field is the one currently accepting keystrokes */
+  active?: boolean;
 }
 
 export default function AnswerInput({
@@ -14,6 +17,8 @@ export default function AnswerInput({
   maxLength = 20,
   isCorrect = null,
   correctAnswer,
+  label,
+  active = true,
 }: AnswerInputProps) {
   const displayLength = maxLength;
   const chars = value.split('');
@@ -21,13 +26,15 @@ export default function AnswerInput({
   let borderColor: string = Colors.border;
   if (isCorrect === true) borderColor = Colors.success;
   if (isCorrect === false) borderColor = Colors.error;
+  if (active && isCorrect === null) borderColor = Colors.primary;
 
   return (
     <View style={styles.container}>
+      {label && <Text style={styles.label}>{label}</Text>}
       <View style={[styles.inputRow, { borderColor }]}>
         {Array.from({ length: displayLength }).map((_, i) => {
           const char = chars[i] ?? '';
-          const isActive = i === chars.length && isCorrect === null;
+          const isActiveCell = active && i === chars.length && isCorrect === null;
 
           return (
             <View
@@ -35,7 +42,7 @@ export default function AnswerInput({
               style={[
                 styles.cell,
                 char ? styles.cellFilled : styles.cellEmpty,
-                isActive && styles.cellActive,
+                isActiveCell && styles.cellActive,
               ]}
             >
               <Text style={styles.cellText}>{char}</Text>
@@ -57,7 +64,12 @@ export default function AnswerInput({
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    gap: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  label: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    color: Colors.textSecondary,
   },
   inputRow: {
     flexDirection: 'row',

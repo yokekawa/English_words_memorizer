@@ -7,6 +7,7 @@ import RegistrationStack from './RegistrationStack';
 import StudyStack from './StudyStack';
 import WordListStack from './WordListStack';
 import SettingsScreen from '@/screens/settings/SettingsScreen';
+import HelpScreen from '@/screens/help/HelpScreen';
 import { Colors } from '@/constants';
 
 const Tab = createBottomTabNavigator<RootTabParams>();
@@ -61,6 +62,20 @@ export default function RootNavigator() {
             tabBarLabel: '単語帳',
             tabBarIcon: ({ focused }) => (
               <TabIcon emoji="📖" focused={focused} />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Help"
+          component={HelpScreen}
+          options={{
+            tabBarLabel: '使い方',
+            headerShown: true,
+            headerTitle: '使い方',
+            headerStyle: { backgroundColor: Colors.primary },
+            headerTintColor: Colors.textOnPrimary,
+            tabBarIcon: ({ focused }) => (
+              <TabIcon emoji="❓" focused={focused} />
             ),
           }}
         />
