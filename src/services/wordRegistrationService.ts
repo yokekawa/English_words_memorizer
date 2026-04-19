@@ -1,5 +1,5 @@
 import { lookupWord } from '@/api/dictionary/freeDictionaryClient';
-import { translateToJapanese } from '@/api/translation/myMemoryClient';
+import { translateToJapanese } from '@/api/dictionary/jishoClient';
 import { generateConjugations, lemmatize } from '@/api/conjugation/inflectorsService';
 import { WordRepository } from '@/database/repositories/wordRepository';
 import { Word, WordDraft } from '@/types';
@@ -12,26 +12,27 @@ export class WordRegistrationService {
     // Step 1: Lemmatize locally (using → use, ran → run, studies → study, mice → mouse)
     const lemma = lemmatize(rawWord);
 
-    // Step 2: Look up lemma in dictionary + translate in parallel
-    const [dictResult, japaneseResult] = await Promise.allSettled([
-      lookupWord(lemma),
-      translateToJapanese(lemma),
-    ]);
-
-    const dictData =
-      dictResult.status === 'fulfilled'
-        ? dictResult.value
-        : { baseForm: lemma, phonetic: null, partOfSpeech: 'unknown' as const };
+    // Step 2: Look up lemma in the English dictionary first to get POS
+    let dictData;
+    try {
+      dictData = await lookupWord(lemma);
+    } catch {
+      dictData = { baseForm: lemma, phonetic: null, partOfSpeech: 'unknown' as const };
+    }
 
     // Step 3: Use the dictionary's canonical form if it differs (e.g. API normalizes casing)
     const baseForm = dictData.baseForm || lemma;
 
-    const japaneseMeaning =
-      japaneseResult.status === 'fulfilled'
-        ? japaneseResult.value
-        : '(要確認)';
+    // Step 4: Translate to Japanese via Jisho (JMdict), using the POS to pick
+    // the right sense (verbal form for verbs, etc.)
+    let japaneseMeaning: string;
+    try {
+      japaneseMeaning = await translateToJapanese(baseForm, dictData.partOfSpeech);
+    } catch {
+      japaneseMeaning = '(要確認)';
+    }
 
-    // Step 4: Generate conjugations for the true base form
+    // Step 5: Generate conjugations for the true base form
     const conjugations = generateConjugations(baseForm, dictData.partOfSpeech);
 
     return {
