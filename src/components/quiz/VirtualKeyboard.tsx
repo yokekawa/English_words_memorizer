@@ -5,27 +5,18 @@ import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants
 import { useSettingsStore } from '@/store/settingsStore';
 
 const ROWS = [
-  ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
-  ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
-  ['Z', 'X', 'C', 'V', 'B', 'N', 'M'],
+  ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
+  ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
+  ['z', 'x', 'c', 'v', 'b', 'n', 'm'],
 ];
-
-// Special characters needed for English words (hyphens, apostrophes)
-const SPECIAL_CHARS = ["'", '-'];
 
 interface VirtualKeyboardProps {
   onKeyPress: (key: string) => void;
-  onBackspace: () => void;
-  onSubmit: () => void;
-  currentInput: string;
   disabled?: boolean;
 }
 
 export default function VirtualKeyboard({
   onKeyPress,
-  onBackspace,
-  onSubmit,
-  currentInput,
   disabled = false,
 }: VirtualKeyboardProps) {
   const hapticEnabled = useSettingsStore(s => s.hapticEnabled);
@@ -35,23 +26,7 @@ export default function VirtualKeyboard({
     if (hapticEnabled) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    onKeyPress(key.toLowerCase());
-  };
-
-  const handleBackspace = () => {
-    if (disabled) return;
-    if (hapticEnabled) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    onBackspace();
-  };
-
-  const handleSubmit = () => {
-    if (disabled || !currentInput) return;
-    if (hapticEnabled) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-    onSubmit();
+    onKeyPress(key);
   };
 
   return (
@@ -71,44 +46,6 @@ export default function VirtualKeyboard({
           ))}
         </View>
       ))}
-
-      {/* Bottom row: backspace + special chars + submit */}
-      <View style={styles.row}>
-        <TouchableOpacity
-          style={[styles.key, styles.actionKey, styles.backspaceKey]}
-          onPress={handleBackspace}
-          disabled={disabled}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.actionKeyText}>⌫</Text>
-        </TouchableOpacity>
-
-        {SPECIAL_CHARS.map(char => (
-          <TouchableOpacity
-            key={char}
-            style={[styles.key, styles.specialCharKey, disabled && styles.keyDisabled]}
-            onPress={() => handleKey(char)}
-            disabled={disabled}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.specialCharText}>{char}</Text>
-          </TouchableOpacity>
-        ))}
-
-        <TouchableOpacity
-          style={[
-            styles.key,
-            styles.actionKey,
-            styles.submitKey,
-            (!currentInput || disabled) && styles.submitDisabled,
-          ]}
-          onPress={handleSubmit}
-          disabled={!currentInput || disabled}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.actionKeyText}>✓</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
@@ -144,35 +81,7 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.semibold,
     color: Colors.keyboard.text,
   },
-  specialCharKey: {
-    flex: 1.5,
-    maxWidth: 52,
-    backgroundColor: Colors.keyboard.backspace,
-  },
-  specialCharText: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
-    color: Colors.keyboard.text,
-  },
   keyDisabled: {
     opacity: 0.5,
-  },
-  actionKey: {
-    maxWidth: 48,
-    flex: 1.4,
-  },
-  actionKeyText: {
-    fontSize: FontSize.lg,
-    color: Colors.textOnPrimary,
-    fontWeight: FontWeight.bold,
-  },
-  backspaceKey: {
-    backgroundColor: Colors.keyboard.backspace,
-  },
-  submitKey: {
-    backgroundColor: Colors.keyboard.submit,
-  },
-  submitDisabled: {
-    opacity: 0.3,
   },
 });

@@ -157,9 +157,6 @@ export default function QuizScreen({ navigation }: Props) {
 
       <VirtualKeyboard
         onKeyPress={handleKeyPress}
-        onBackspace={() => {}}
-        onSubmit={() => {}}
-        currentInput={input}
         disabled={feedbackState !== null || isSubmitting}
       />
     </View>
