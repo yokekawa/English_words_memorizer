@@ -50,5 +50,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     eas: {
       projectId: 'dbaa0d80-2d1e-4ce3-b8fb-8fddf6d1d5d6',
     },
+    androidPackage: 'com.yokekawa.englishwordsmemorizer',
+    androidCertSha1: process.env.ANDROID_CERT_SHA1 ?? '',
+
   },
 });
