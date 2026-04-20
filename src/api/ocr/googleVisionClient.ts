@@ -27,7 +27,8 @@ export async function recognizeText(
   imageWidth: number,
   imageHeight: number
 ): Promise<OCRResult> {
-  const apiKey = Constants.expoConfig?.extra?.googleVisionApiKey as string;
+  const extra = Constants.expoConfig?.extra ?? {};
+  const apiKey = extra.googleVisionApiKey as string;
   if (!apiKey) {
     throw new Error(
       'Google Vision API キーが設定されていません。.envファイルにGOOGLE_VISION_API_KEYを設定してください。'
@@ -43,9 +44,23 @@ export async function recognizeText(
     ],
   };
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  // Manually attach Android app identity so server-side API key restrictions
+  // (Android app + SHA-1) accept requests from plain fetch, which does not
+  // inject these automatically unlike the Google Play Services client.
+  const androidPackage = extra.androidPackage as string | undefined;
+  const androidCertSha1 = extra.androidCertSha1 as string | undefined;
+  if (androidPackage && androidCertSha1) {
+    headers['X-Android-Package'] = androidPackage;
+    headers['X-Android-Cert'] = androidCertSha1;
+  }
+
   const response = await fetch(`${API_URL}?key=${apiKey}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   });
 

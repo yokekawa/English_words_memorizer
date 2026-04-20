@@ -41,5 +41,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ],
   extra: {
     googleVisionApiKey: process.env.GOOGLE_VISION_API_KEY ?? '',
+    androidPackage: 'com.yokekawa.englishwordsmemorizer',
+    androidCertSha1: process.env.ANDROID_CERT_SHA1 ?? '',
   },
 });
