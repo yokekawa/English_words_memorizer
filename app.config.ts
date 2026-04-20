@@ -16,14 +16,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   assetBundlePatterns: ['**/*'],
   ios: {
     supportsTablet: true,
-    bundleIdentifier: 'com.yourname.englishwordsmemorizer',
+    bundleIdentifier: 'com.yokekawa.englishwordsmemorizer',
   },
   android: {
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#1a56db',
     },
-    package: 'com.yourname.englishwordsmemorizer',
+    package: 'com.yokekawa.englishwordsmemorizer',
   },
   plugins: [
     [
