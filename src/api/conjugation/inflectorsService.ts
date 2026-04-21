@@ -21,6 +21,25 @@ const IRREGULAR_ADJECTIVES: Record<string, string> = {
 };
 
 /**
+ * Verbs with multiple accepted past / past-participle forms. Listed forms are
+ * all registered so either is accepted in quizzes.
+ */
+const VERB_ALTERNATE_FORMS: Record<
+  string,
+  { past?: string[]; pastParticiple?: string[] }
+> = {
+  be: { past: ['was', 'were'], pastParticiple: ['been'] },
+  dive: { past: ['dived', 'dove'] },
+  dream: { past: ['dreamed', 'dreamt'], pastParticiple: ['dreamed', 'dreamt'] },
+  learn: { past: ['learned', 'learnt'], pastParticiple: ['learned', 'learnt'] },
+  burn: { past: ['burned', 'burnt'], pastParticiple: ['burned', 'burnt'] },
+  spell: { past: ['spelled', 'spelt'], pastParticiple: ['spelled', 'spelt'] },
+  smell: { past: ['smelled', 'smelt'], pastParticiple: ['smelled', 'smelt'] },
+  spoil: { past: ['spoiled', 'spoilt'], pastParticiple: ['spoiled', 'spoilt'] },
+  leap: { past: ['leaped', 'leapt'], pastParticiple: ['leaped', 'leapt'] },
+};
+
+/**
  * Given any inflected form, return the base/lemma form.
  * Covers verbs (using→use, ran→run), nouns (mice→mouse),
  * and adjectives (happier→happy, biggest→big, better→good).
@@ -101,13 +120,19 @@ export function generateConjugations(
   try {
     if (partOfSpeech === 'verb') {
       const inflector = new Inflectors(word);
-      const past = inflector.toPast?.();
-      if (past && past !== word) results.push({ type: 'past_tense', form: past });
+      const alts = VERB_ALTERNATE_FORMS[word.toLowerCase()];
 
-      const pastParticiple = inflector.toPastParticiple?.();
-      if (pastParticiple && pastParticiple !== word && pastParticiple !== past) {
-        results.push({ type: 'past_participle', form: pastParticiple });
-      }
+      // Always emit past / past_participle even when identical to the base
+      // form (hit/hit/hit, cut/cut/cut), so quiz modes that require those
+      // conjugations still include the verb. Alternate forms (be → was/were)
+      // come from VERB_ALTERNATE_FORMS so the quiz accepts either.
+      const pastForms = alts?.past ?? [inflector.toPast?.() || word];
+      pastForms.forEach(p => results.push({ type: 'past_tense', form: p }));
+
+      const ppForms =
+        alts?.pastParticiple ??
+        [inflector.toPastParticiple?.() || pastForms[0]];
+      ppForms.forEach(p => results.push({ type: 'past_participle', form: p }));
 
       const ingForm = toGerund(word);
       if (ingForm !== word) results.push({ type: 'present_participle', form: ingForm });
