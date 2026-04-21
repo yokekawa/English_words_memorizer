@@ -31,6 +31,7 @@ export type StudyStackParams = {
 export type WordListStackParams = {
   WordList: undefined;
   WordEdit: { wordId: number };
+  ManualEntry: undefined;
 };
 
 export type RootTabParams = {

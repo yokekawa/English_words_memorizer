@@ -5,6 +5,7 @@ import {
   TextInput,
   StyleSheet,
   Text,
+  TouchableOpacity,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { WordListStackParams } from '@/types';
@@ -44,6 +45,13 @@ export default function WordListScreen({ navigation }: Props) {
           placeholderTextColor={Colors.textTertiary}
           clearButtonMode="while-editing"
         />
+        <TouchableOpacity
+          style={styles.manualEntryBtn}
+          onPress={() => navigation.navigate('ManualEntry')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.manualEntryBtnText}>＋ 手動で単語を追加</Text>
+        </TouchableOpacity>
       </View>
 
       {filtered.length === 0 ? (
@@ -55,7 +63,7 @@ export default function WordListScreen({ navigation }: Props) {
           <Text style={styles.emptySubtitle}>
             {query
               ? '別のキーワードで検索してください'
-              : '登録タブからカメラで単語を追加してください'}
+              : '登録タブからカメラで、または上の「手動で単語を追加」から登録できます'}
           </Text>
         </View>
       ) : (
@@ -86,6 +94,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+    gap: Spacing.sm,
   },
   searchInput: {
     backgroundColor: Colors.surfaceSecondary,
@@ -94,6 +103,20 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     fontSize: FontSize.md,
     color: Colors.text,
+  },
+  manualEntryBtn: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.surface,
+  },
+  manualEntryBtnText: {
+    fontSize: FontSize.sm,
+    color: Colors.primary,
+    fontWeight: '600',
   },
   list: {
     padding: Spacing.md,
