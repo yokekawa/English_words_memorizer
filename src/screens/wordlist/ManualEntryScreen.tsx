@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { WordListStackParams, PartOfSpeech, WordDraft } from '@/types';
 import Button from '@/components/common/Button';
 import { wordRegistrationService } from '@/services/wordRegistrationService';
+import { generateConjugations } from '@/api/conjugation/inflectorsService';
 import { useWordStore } from '@/store/wordStore';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants';
 
@@ -89,6 +90,15 @@ export default function ManualEntryScreen({ navigation }: Props) {
     };
   }, [spelling]);
 
+  // Conjugations reflect the currently-selected POS, not the dictionary's
+  // originally-detected POS, so switching from noun→verb immediately shows
+  // the verb conjugations (and vice versa).
+  const effectiveBaseForm = (draft?.baseForm ?? spelling.trim().toLowerCase());
+  const liveConjugations = useMemo(
+    () => (effectiveBaseForm ? generateConjugations(effectiveBaseForm, pos) : []),
+    [effectiveBaseForm, pos]
+  );
+
   const canSave =
     spelling.trim().length >= 2 &&
     japanese.trim().length > 0 &&
@@ -99,20 +109,13 @@ export default function ManualEntryScreen({ navigation }: Props) {
     if (!canSave) return;
     setIsSaving(true);
     try {
-      // Use the autofilled draft as a base (so phonetic / conjugations are
-      // populated), but apply the user's edits to japanese & pos.
-      const base: WordDraft = draft ?? {
-        baseForm: spelling.trim().toLowerCase(),
-        partOfSpeech: pos,
-        phonetic: null,
-        japaneseMeaning: japanese.trim(),
-        conjugations: [],
-      };
       const finalDraft: WordDraft = {
-        ...base,
-        baseForm: base.baseForm || spelling.trim().toLowerCase(),
+        baseForm: effectiveBaseForm,
         partOfSpeech: pos,
+        phonetic: draft?.phonetic ?? null,
         japaneseMeaning: japanese.trim(),
+        exampleSentence: draft?.exampleSentence,
+        conjugations: liveConjugations,
       };
       const registered = await wordRegistrationService.registerWord(finalDraft);
       addWord(registered);
@@ -196,10 +199,10 @@ export default function ManualEntryScreen({ navigation }: Props) {
             </View>
           </View>
 
-          {draft && draft.conjugations.length > 0 && (
+          {liveConjugations.length > 0 && (
             <View style={styles.conjBlock}>
-              <Text style={styles.fieldLabel}>取得された活用形</Text>
-              {draft.conjugations.map((c, i) => (
+              <Text style={styles.fieldLabel}>活用形 (選択中の品詞で生成)</Text>
+              {liveConjugations.map((c, i) => (
                 <Text key={i} style={styles.conjLine}>
                   ・{c.type}: {c.form}
                 </Text>
