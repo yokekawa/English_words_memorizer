@@ -84,27 +84,45 @@ function scoreEntry(
 ): { score: number; senseIndex: number } {
   let bestSense = -1;
   let bestScore = -Infinity;
+  let anySensePosMatch = false;
 
   entry.senses.forEach((sense, i) => {
+    const tagsJoined = (sense.tags ?? []).join(' ').toLowerCase();
+    const posJoined = sense.parts_of_speech.join(' ').toLowerCase();
+    const combined = `${posJoined} ${tagsJoined}`;
+
     let score = 0;
-    if (matchesPos(sense.parts_of_speech, targetPos)) score += 100;
-    if (definitionMatchesWord(sense.english_definitions, word)) score += 50;
-    // Earlier senses are usually more common meanings
-    score -= i * 2;
-    // Prefer Ichidan/Godan (pure verb) over Suru verb for verbs
-    if (targetPos === 'verb') {
-      const joined = sense.parts_of_speech.join(' ').toLowerCase();
-      if (/ichidan|godan/.test(joined)) score += 10;
-      if (/suru verb/.test(joined)) score += 5;
+    if (matchesPos(sense.parts_of_speech, targetPos)) {
+      score += 100;
+      anySensePosMatch = true;
     }
+    if (definitionMatchesWord(sense.english_definitions, word)) score += 50;
+    score -= i * 2;
+
+    if (targetPos === 'verb') {
+      if (/ichidan|godan/.test(posJoined)) score += 10;
+      if (/suru verb/.test(posJoined)) score += 5;
+    }
+
+    // Penalize obscure / archaic / humble / honorific / dated senses so common
+    // everyday meanings win for learner-oriented translation.
+    if (/\barchaic\b|\bdated\b|\bobsolete\b/.test(combined)) score -= 150;
+    if (/\bobscure\b|\brare\b/.test(combined)) score -= 120;
+    if (/\bhumble\b|\bhonorific\b|\bpolite\b/.test(combined)) score -= 80;
+    if (/\bderogatory\b|\bvulgar\b|\bslang\b/.test(combined)) score -= 60;
+
     if (score > bestScore) {
       bestScore = score;
       bestSense = i;
     }
   });
 
-  // Common word bonus applies to the whole entry
-  if (entry.is_common) bestScore += 30;
+  // Hard exclude entries whose senses never match the target POS at all.
+  if (!anySensePosMatch) return { score: -Infinity, senseIndex: 0 };
+
+  // Common-word bonus dominates so JMdict-marked common entries win unless
+  // a non-common entry has very strong POS+definition match.
+  if (entry.is_common) bestScore += 200;
 
   return { score: bestScore, senseIndex: Math.max(0, bestSense) };
 }
@@ -136,7 +154,14 @@ export async function translateToJapanese(
     }
   }
 
-  if (!best || !best.entry.japanese[0]) {
+  // Fallback: if no entry has any sense matching the target POS, pick the
+  // first common entry (or first overall) so we still return something.
+  if (!best || best.score === -Infinity) {
+    const fallback = data.data.find(e => e.is_common) ?? data.data[0];
+    best = { entry: fallback, senseIndex: 0, score: 0 };
+  }
+
+  if (!best.entry.japanese[0]) {
     throw new Error('Jisho: no usable entry');
   }
 
