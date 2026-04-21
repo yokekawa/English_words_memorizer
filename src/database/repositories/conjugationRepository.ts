@@ -26,9 +26,11 @@ export class ConjugationRepository {
   }
 
   async insert(wordId: number, type: ConjugationType, form: string): Promise<void> {
+    // OR IGNORE so duplicates of the same (word, type, form) are silently
+    // skipped, while different forms of the same type (be → was/were) coexist.
     await execute(
       this.db,
-      `INSERT OR REPLACE INTO conjugations (word_id, type, form) VALUES (?, ?, ?)`,
+      `INSERT OR IGNORE INTO conjugations (word_id, type, form) VALUES (?, ?, ?)`,
       [wordId, type, form]
     );
   }

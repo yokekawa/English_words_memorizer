@@ -21,7 +21,7 @@ export const CREATE_CONJUGATIONS_TABLE = `
     word_id   INTEGER NOT NULL REFERENCES words(id) ON DELETE CASCADE,
     type      TEXT NOT NULL,
     form      TEXT NOT NULL,
-    UNIQUE(word_id, type)
+    UNIQUE(word_id, type, form)
   )
 `;
 
