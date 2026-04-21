@@ -26,6 +26,14 @@ export interface QuizQuestion {
   correctAnswer: string;
   /** Second expected answer for "_both" modes (e.g. past participle, superlative) */
   correctAnswer2?: string;
+  /**
+   * All acceptable answers for the first field (includes correctAnswer plus
+   * any alternates, e.g. be → past tense ['was', 'were']). Optional — when
+   * omitted, only correctAnswer is accepted.
+   */
+  acceptableAnswers?: string[];
+  /** All acceptable answers for the second field. */
+  acceptableAnswers2?: string[];
   /** Label for the first answer field when dual-input (e.g. "過去形") */
   label1?: string;
   /** Label for the second answer field when dual-input (e.g. "過去分詞形") */

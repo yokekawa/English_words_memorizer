@@ -7,8 +7,8 @@ function makeId(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-function findConj(word: Word, type: string): string | undefined {
-  return word.conjugations.find(c => c.type === type)?.form;
+function findConjs(word: Word, type: string): string[] {
+  return word.conjugations.filter(c => c.type === type).map(c => c.form);
 }
 
 function buildQuestion(word: Word, mode: QuizMode): QuizQuestion | null {
@@ -37,92 +37,101 @@ function buildQuestion(word: Word, mode: QuizMode): QuizQuestion | null {
     }
 
     case 'base_to_past': {
-      const past = findConj(word, 'past_tense');
-      if (!past) return null;
+      const pasts = findConjs(word, 'past_tense');
+      if (pasts.length === 0) return null;
       return {
         id: makeId(),
         wordId: word.id,
         mode,
         prompt: `${word.baseForm}  ―  過去形は？`,
-        correctAnswer: past,
+        correctAnswer: pasts[0],
+        acceptableAnswers: pasts,
       };
     }
 
     case 'base_to_past_participle': {
-      const pp = findConj(word, 'past_participle');
-      if (!pp) return null;
+      const pps = findConjs(word, 'past_participle');
+      if (pps.length === 0) return null;
       return {
         id: makeId(),
         wordId: word.id,
         mode,
         prompt: `${word.baseForm}  ―  過去分詞形は？`,
-        correctAnswer: pp,
+        correctAnswer: pps[0],
+        acceptableAnswers: pps,
       };
     }
 
     case 'base_to_past_both': {
-      const past = findConj(word, 'past_tense');
-      const pp = findConj(word, 'past_participle');
-      if (!past || !pp) return null;
+      const pasts = findConjs(word, 'past_tense');
+      const pps = findConjs(word, 'past_participle');
+      if (pasts.length === 0 || pps.length === 0) return null;
       return {
         id: makeId(),
         wordId: word.id,
         mode,
         prompt: `${word.baseForm}  ―  過去形と過去分詞形は？`,
-        correctAnswer: past,
-        correctAnswer2: pp,
+        correctAnswer: pasts[0],
+        correctAnswer2: pps[0],
+        acceptableAnswers: pasts,
+        acceptableAnswers2: pps,
         label1: '過去形',
         label2: '過去分詞形',
       };
     }
 
     case 'base_to_plural': {
-      const pl = findConj(word, 'plural');
-      if (!pl) return null;
+      const pls = findConjs(word, 'plural');
+      if (pls.length === 0) return null;
       return {
         id: makeId(),
         wordId: word.id,
         mode,
         prompt: `${word.baseForm}  ―  複数形は？`,
-        correctAnswer: pl,
+        correctAnswer: pls[0],
+        acceptableAnswers: pls,
       };
     }
 
     case 'base_to_comparative': {
-      const c = findConj(word, 'comparative');
-      if (!c) return null;
+      const cs = findConjs(word, 'comparative');
+      if (cs.length === 0) return null;
       return {
         id: makeId(),
         wordId: word.id,
         mode,
         prompt: `${word.baseForm}  ―  比較級は？`,
-        correctAnswer: c,
+        correctAnswer: cs[0],
+        acceptableAnswers: cs,
       };
     }
 
     case 'base_to_superlative': {
-      const s = findConj(word, 'superlative');
-      if (!s) return null;
+      const ss = findConjs(word, 'superlative');
+      if (ss.length === 0) return null;
       return {
         id: makeId(),
         wordId: word.id,
         mode,
         prompt: `${word.baseForm}  ―  最上級は？`,
-        correctAnswer: s,
+        correctAnswer: ss[0],
+        acceptableAnswers: ss,
       };
     }
 
     case 'base_to_comparative_both': {
-      const c = findConj(word, 'comparative');
-      const s = findConj(word, 'superlative');
-      if (!c || !s) return null;
+      const cs = findConjs(word, 'comparative');
+      const ss = findConjs(word, 'superlative');
+      if (cs.length === 0 || ss.length === 0) return null;
       return {
         id: makeId(),
         wordId: word.id,
         mode,
         prompt: `${word.baseForm}  ―  比較級と最上級は？`,
-        correctAnswer: c,
-        correctAnswer2: s,
+        correctAnswer: cs[0],
+        correctAnswer2: ss[0],
+        acceptableAnswers: cs,
+        acceptableAnswers2: ss,
         label1: '比較級',
         label2: '最上級',
       };

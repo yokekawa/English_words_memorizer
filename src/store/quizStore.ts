@@ -7,7 +7,7 @@ import {
   WordFilter,
 } from '@/types';
 import { quizGenerationService } from '@/services/quizGenerationService';
-import { evaluateAnswer, recordAttempt, buildResult } from '@/services/scoringService';
+import { evaluateAnswer, evaluateAnswerAny, recordAttempt, buildResult } from '@/services/scoringService';
 import { QuizResultRepository } from '@/database/repositories/quizResultRepository';
 import { getDatabase } from '@/database/db';
 import { useWordStore } from './wordStore';
@@ -48,9 +48,13 @@ export const useQuizStore = create<QuizState>((set, get) => ({
     const question = session.questions[currentIndex];
     if (!question) return null;
 
-    const correct1 = evaluateAnswer(userAnswer, question.correctAnswer);
+    const acceptable1 = question.acceptableAnswers ?? [question.correctAnswer];
+    const correct1 = evaluateAnswerAny(userAnswer, acceptable1);
     const correct2 = question.correctAnswer2
-      ? evaluateAnswer(userAnswer2 ?? '', question.correctAnswer2)
+      ? evaluateAnswerAny(
+          userAnswer2 ?? '',
+          question.acceptableAnswers2 ?? [question.correctAnswer2]
+        )
       : true;
     const isCorrect = correct1 && correct2;
     const timeSpentMs = Date.now() - questionStartTime;

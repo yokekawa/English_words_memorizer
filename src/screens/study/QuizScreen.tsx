@@ -61,9 +61,15 @@ export default function QuizScreen({ navigation }: Props) {
   if (!currentQuestion) return null;
 
   const isDual = currentQuestion.correctAnswer2 !== undefined;
-  const currentAnswer = activeField === 0
-    ? currentQuestion.correctAnswer
-    : (currentQuestion.correctAnswer2 ?? '');
+  const acceptableForField = (field: 0 | 1): string[] => {
+    if (field === 0) {
+      return currentQuestion.acceptableAnswers ?? [currentQuestion.correctAnswer];
+    }
+    return (
+      currentQuestion.acceptableAnswers2 ?? [currentQuestion.correctAnswer2 ?? '']
+    );
+  };
+  const currentAcceptable = acceptableForField(activeField);
   const currentInput = activeField === 0 ? input1 : input2;
 
   const doSubmit = async (ans1: string, ans2: string) => {
@@ -103,18 +109,25 @@ export default function QuizScreen({ navigation }: Props) {
   const handleKeyPress = (key: string) => {
     if (feedbackState !== null || isSubmitting) return;
 
-    const expectedChar = currentAnswer[currentInput.length];
-    if (!expectedChar) return;
+    // Candidate new input — accept iff any acceptable answer starts with it.
+    const candidate = (currentInput + key).toLowerCase();
+    const matchesAnyPrefix = currentAcceptable.some(ans =>
+      ans.toLowerCase().startsWith(candidate)
+    );
 
-    if (key.toLowerCase() === expectedChar.toLowerCase()) {
-      const newInput = currentInput + key.toLowerCase();
+    if (matchesAnyPrefix) {
+      const newInput = candidate;
       if (activeField === 0) {
         setInput1(newInput);
       } else {
         setInput2(newInput);
       }
 
-      if (newInput.length === currentAnswer.length) {
+      // Completed iff the typed input equals any acceptable answer in full.
+      const completesAnswer = currentAcceptable.some(
+        ans => ans.toLowerCase() === newInput
+      );
+      if (completesAnswer) {
         if (activeField === 0 && isDual) {
           // Move to second field
           setActiveField(1);
@@ -148,8 +161,10 @@ export default function QuizScreen({ navigation }: Props) {
     }
   };
 
-  const primaryAnswerLength = currentQuestion.correctAnswer.length;
-  const secondaryAnswerLength = (currentQuestion.correctAnswer2 ?? '').length;
+  const maxLen = (answers: string[]): number =>
+    answers.reduce((m, a) => Math.max(m, a.length), 0);
+  const primaryAnswerLength = maxLen(acceptableForField(0));
+  const secondaryAnswerLength = isDual ? maxLen(acceptableForField(1)) : 0;
 
   return (
     <View

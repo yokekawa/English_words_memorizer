@@ -20,6 +20,15 @@ export function evaluateAnswer(
   return userAnswer.trim().toLowerCase() === correctAnswer.trim().toLowerCase();
 }
 
+/** Accept the user answer if it matches any of the listed acceptable forms. */
+export function evaluateAnswerAny(
+  userAnswer: string,
+  acceptableAnswers: string[]
+): boolean {
+  const normalized = userAnswer.trim().toLowerCase();
+  return acceptableAnswers.some(a => a.trim().toLowerCase() === normalized);
+}
+
 export async function recordAttempt(
   attempt: QuizAttempt,
   currentTimesCorrect: number
