@@ -24,6 +24,7 @@ export default function RootNavigator() {
   return (
     <NavigationContainer>
       <Tab.Navigator
+        initialRouteName="Study"
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: Colors.primary,
