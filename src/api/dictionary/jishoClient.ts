@@ -2,6 +2,65 @@ import { PartOfSpeech } from '@/types';
 
 const BASE_URL = 'https://jisho.org/api/v1/search/words';
 
+/**
+ * Curated override for basic high-frequency verbs where Jisho's keyword search
+ * surfaces valid-but-non-canonical forms (e.g. 遣る or 執り行う instead of する).
+ * Only applied when the target POS is verb.
+ */
+const COMMON_VERB_OVERRIDES: Record<string, string> = {
+  do:     'する',
+  come:   '来る',
+  go:     '行く',
+  get:    '得る',
+  give:   '与える',
+  take:   '取る',
+  make:   '作る',
+  see:    '見る',
+  look:   '見る',
+  know:   '知る',
+  think:  '思う',
+  say:    '言う',
+  tell:   '伝える',
+  ask:    '尋ねる',
+  find:   '見つける',
+  become: 'なる',
+  leave:  '去る',
+  feel:   '感じる',
+  try:    '試す',
+  use:    '使う',
+  work:   '働く',
+  eat:    '食べる',
+  drink:  '飲む',
+  run:    '走る',
+  walk:   '歩く',
+  sit:    '座る',
+  stand:  '立つ',
+  sleep:  '寝る',
+  read:   '読む',
+  write:  '書く',
+  speak:  '話す',
+  hear:   '聞く',
+  listen: '聞く',
+  want:   '欲しい',
+  like:   '好む',
+  love:   '愛する',
+  live:   '住む',
+  die:    '死ぬ',
+  put:    '置く',
+  hold:   '持つ',
+  keep:   '保つ',
+  wait:   '待つ',
+  start:  '始める',
+  stop:   '止める',
+  open:   '開ける',
+  close:  '閉める',
+  buy:    '買う',
+  sell:   '売る',
+  learn:  '学ぶ',
+  teach:  '教える',
+  help:   '助ける',
+};
+
 interface JishoJapanese {
   word?: string;
   reading?: string;
@@ -100,8 +159,11 @@ function scoreEntry(
     score -= i * 2;
 
     if (targetPos === 'verb') {
-      if (/ichidan|godan/.test(posJoined)) score += 10;
-      if (/suru verb/.test(posJoined)) score += 5;
+      // Small bonuses; previously godan got +10 which let colloquial verbs
+      // like 遣る beat the canonical suru verb する. Keep them low and roughly
+      // balanced so common-word + exact-def-match dominates.
+      if (/ichidan|godan/.test(posJoined)) score += 3;
+      if (/suru verb/.test(posJoined)) score += 3;
     }
 
     // Penalize obscure / archaic / humble / honorific / dated senses so common
@@ -135,6 +197,12 @@ export async function translateToJapanese(
   word: string,
   partOfSpeech: PartOfSpeech
 ): Promise<string> {
+  // Curated override: top-frequency verbs where Jisho's ranking is unreliable.
+  if (partOfSpeech === 'verb') {
+    const override = COMMON_VERB_OVERRIDES[word.toLowerCase()];
+    if (override) return override;
+  }
+
   // Jisho's search ranks by reading/romaji match first, which surfaces junk
   // like 度 (reading "do") ahead of する for a bare "do" query. For verbs we
   // force a quoted English-definition search ("to do") first; if that fails
@@ -158,10 +226,14 @@ export async function translateToJapanese(
     if (entries.length === 0) continue;
     if (firstResponseData.length === 0) firstResponseData = entries;
 
-    for (const entry of entries) {
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
       const { score, senseIndex } = scoreEntry(entry, partOfSpeech, word);
-      if (!bestOverall || score > bestOverall.score) {
-        bestOverall = { entry, senseIndex, score };
+      // Slight preference for earlier entries, so Jisho's own ranking acts
+      // as a tie-breaker when multiple entries have the same common-POS score.
+      const adjusted = score === -Infinity ? score : score - i * 3;
+      if (!bestOverall || adjusted > bestOverall.score) {
+        bestOverall = { entry, senseIndex, score: adjusted };
       }
     }
 
