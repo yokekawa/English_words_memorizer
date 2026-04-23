@@ -135,37 +135,62 @@ export async function translateToJapanese(
   word: string,
   partOfSpeech: PartOfSpeech
 ): Promise<string> {
-  const url = `${BASE_URL}?keyword=${encodeURIComponent(word)}`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Jisho API エラー: ${response.status}`);
-  }
+  // Jisho's search ranks by reading/romaji match first, which surfaces junk
+  // like 度 (reading "do") ahead of する for a bare "do" query. For verbs we
+  // force a quoted English-definition search ("to do") first; if that fails
+  // to produce a POS-matching result, fall back to the plain keyword.
+  const queries =
+    partOfSpeech === 'verb'
+      ? [`"to ${word}"`, word]
+      : [word];
 
-  const data: JishoResponse = await response.json();
-  if (!data.data || data.data.length === 0) {
-    throw new Error('Jisho: no entries');
-  }
+  let bestOverall:
+    | { entry: JishoEntry; senseIndex: number; score: number }
+    | null = null;
+  let firstResponseData: JishoEntry[] = [];
 
-  let best: { entry: JishoEntry; senseIndex: number; score: number } | null = null;
-  for (const entry of data.data) {
-    const { score, senseIndex } = scoreEntry(entry, partOfSpeech, word);
-    if (!best || score > best.score) {
-      best = { entry, senseIndex, score };
+  for (const q of queries) {
+    const url = `${BASE_URL}?keyword=${encodeURIComponent(q)}`;
+    const response = await fetch(url);
+    if (!response.ok) continue;
+    const data: JishoResponse = await response.json();
+    const entries = data.data ?? [];
+    if (entries.length === 0) continue;
+    if (firstResponseData.length === 0) firstResponseData = entries;
+
+    for (const entry of entries) {
+      const { score, senseIndex } = scoreEntry(entry, partOfSpeech, word);
+      if (!bestOverall || score > bestOverall.score) {
+        bestOverall = { entry, senseIndex, score };
+      }
     }
+
+    // If this query already found a POS-matching result, don't keep querying.
+    if (bestOverall && bestOverall.score > -Infinity) break;
+  }
+
+  if (!bestOverall) {
+    throw new Error('Jisho: no entries');
   }
 
   // Fallback: if no entry has any sense matching the target POS, pick the
   // first common entry (or first overall) so we still return something.
-  if (!best || best.score === -Infinity) {
-    const fallback = data.data.find(e => e.is_common) ?? data.data[0];
-    best = { entry: fallback, senseIndex: 0, score: 0 };
+  if (bestOverall.score === -Infinity) {
+    const fallback =
+      firstResponseData.find(e => e.is_common) ?? firstResponseData[0];
+    if (!fallback) throw new Error('Jisho: no usable entry');
+    bestOverall = { entry: fallback, senseIndex: 0, score: 0 };
   }
 
-  if (!best.entry.japanese[0]) {
+  if (!bestOverall.entry.japanese[0]) {
     throw new Error('Jisho: no usable entry');
   }
 
-  const translated = formatJapanese(best.entry, best.senseIndex, partOfSpeech);
+  const translated = formatJapanese(
+    bestOverall.entry,
+    bestOverall.senseIndex,
+    partOfSpeech
+  );
   if (!translated) throw new Error('Jisho: empty translation');
   return translated;
 }
