@@ -16,6 +16,7 @@ import { WordListStackParams, PartOfSpeech, WordDraft } from '@/types';
 import Button from '@/components/common/Button';
 import { wordRegistrationService } from '@/services/wordRegistrationService';
 import { generateConjugations } from '@/api/conjugation/inflectorsService';
+import { translateToJapanese } from '@/api/dictionary/jishoClient';
 import { useWordStore } from '@/store/wordStore';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants';
 
@@ -34,6 +35,7 @@ const POS_OPTIONS: { pos: PartOfSpeech; label: string }[] = [
 ];
 
 const AUTOFILL_DEBOUNCE_MS = 600;
+const POS_REFETCH_DEBOUNCE_MS = 300;
 
 export default function ManualEntryScreen({ navigation }: Props) {
   const addWord = useWordStore(s => s.addWord);
@@ -51,6 +53,11 @@ export default function ManualEntryScreen({ navigation }: Props) {
   // makes after autofill resolves.
   const autofilledForRef = useRef<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track what autofill last wrote into japanese/pos so we can detect user
+  // edits and avoid double-fetching for a pos that was just set by autofill.
+  const lastAutofilledJapaneseRef = useRef<string | null>(null);
+  const lastAutofilledPosRef = useRef<PartOfSpeech | null>(null);
+  const posRefetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -75,6 +82,8 @@ export default function ManualEntryScreen({ navigation }: Props) {
         if (autofilledForRef.current === null || autofilledForRef.current !== trimmed) {
           setJapanese(built.japaneseMeaning);
           setPos(built.partOfSpeech);
+          lastAutofilledJapaneseRef.current = built.japaneseMeaning;
+          lastAutofilledPosRef.current = built.partOfSpeech;
         }
         autofilledForRef.current = trimmed;
       } catch (e) {
@@ -89,6 +98,40 @@ export default function ManualEntryScreen({ navigation }: Props) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [spelling]);
+
+  // Re-translate to Japanese when the user changes POS after the initial
+  // autofill, so the meaning matches (e.g. verb "do"→する, then switch to
+  // noun→度). Skipped if the user has manually edited the japanese field.
+  useEffect(() => {
+    if (posRefetchDebounceRef.current) clearTimeout(posRefetchDebounceRef.current);
+    // Only run once initial autofill has populated the refs.
+    if (lastAutofilledPosRef.current === null) return;
+    // Ignore: this pos change IS the initial autofill setting it.
+    if (pos === lastAutofilledPosRef.current) return;
+    // User has hand-edited the japanese field — don't clobber their input.
+    if (japanese !== lastAutofilledJapaneseRef.current) return;
+
+    const baseForm = draft?.baseForm ?? spelling.trim().toLowerCase();
+    if (!baseForm) return;
+
+    posRefetchDebounceRef.current = setTimeout(async () => {
+      setIsAutofilling(true);
+      try {
+        const newJp = await translateToJapanese(baseForm, pos);
+        setJapanese(newJp);
+        lastAutofilledJapaneseRef.current = newJp;
+        lastAutofilledPosRef.current = pos;
+      } catch {
+        // Keep current translation on failure.
+      } finally {
+        setIsAutofilling(false);
+      }
+    }, POS_REFETCH_DEBOUNCE_MS);
+
+    return () => {
+      if (posRefetchDebounceRef.current) clearTimeout(posRefetchDebounceRef.current);
+    };
+  }, [pos, draft?.baseForm, spelling, japanese]);
 
   // Conjugations reflect the currently-selected POS, not the dictionary's
   // originally-detected POS, so switching from noun→verb immediately shows
