@@ -69,13 +69,20 @@ export default function StudyHomeScreen({ navigation, route }: Props) {
   // ── 問題モード ──
   const [selectedMode, setSelectedMode] = useState<QuizMode>('jp_to_en');
 
+  // ── 出題数 (per-session; defaults to the settings-store preference) ──
+  const defaultWordCount = useSettingsStore(s => s.defaultWordCount);
+  type QuestionCount = 5 | 10 | 20 | 'all';
+  const [questionCount, setQuestionCount] = useState<QuestionCount>(() => {
+    if (defaultWordCount === 5 || defaultWordCount === 20) return defaultWordCount;
+    return 10;
+  });
+
   // ── 出題可能数 ──
   const [wordCount, setWordCount] = useState(0);
   const [isCountLoading, setIsCountLoading] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
 
   const startSession = useQuizStore(s => s.startSession);
-  const defaultWordCount = useSettingsStore(s => s.defaultWordCount);
   const { words: allWords, loadWords } = useWordStore();
   const hasInitializedSelection = useRef(false);
   const isManualChange = useRef(false);
@@ -184,10 +191,15 @@ export default function StudyHomeScreen({ navigation, route }: Props) {
     setNewRangeName('');
   };
 
+  const effectiveQuestionCount = useMemo(() => {
+    if (questionCount === 'all') return wordCount;
+    return Math.min(questionCount, wordCount);
+  }, [questionCount, wordCount]);
+
   const handleStart = async () => {
-    if (wordCount === 0) return;
+    if (wordCount === 0 || effectiveQuestionCount === 0) return;
     setIsStarting(true);
-    await startSession(selectedMode, filter, defaultWordCount);
+    await startSession(selectedMode, filter, effectiveQuestionCount);
     const { session } = useQuizStore.getState();
     if (session) navigation.navigate('Quiz', { sessionId: session.id });
     setIsStarting(false);
@@ -289,11 +301,16 @@ export default function StudyHomeScreen({ navigation, route }: Props) {
         <View style={styles.modeGrid}>
           {QUIZ_MODE_GROUPS.map(group => {
             const isActiveGroup = getGroupKeyForMode(selectedMode) === group.key;
+            const hasSubOptions = group.modes.length > 1;
+            // Expand the card to full width when it's active and has sub-options,
+            // so the sub-option chips have room to render cleanly inside it.
+            const cardFullWidth = isActiveGroup && hasSubOptions;
             return (
               <TouchableOpacity
                 key={group.key}
                 style={[
                   styles.modeCard,
+                  cardFullWidth && styles.modeCardFullWidth,
                   isActiveGroup && {
                     borderColor: group.color,
                     backgroundColor: group.color + '18',
@@ -307,45 +324,70 @@ export default function StudyHomeScreen({ navigation, route }: Props) {
                   {group.label}
                 </Text>
                 <Text style={styles.modeDesc}>{group.description}</Text>
+
+                {/* Sub-options are nested inside the active card for immediate
+                    context, and suppressed on inactive cards. */}
+                {isActiveGroup && hasSubOptions && (
+                  <View style={styles.inlineSubChipsRow}>
+                    {group.modes.map(opt => {
+                      const active = selectedMode === opt.mode;
+                      return (
+                        <TouchableOpacity
+                          key={opt.mode}
+                          style={[
+                            styles.subChip,
+                            active && {
+                              backgroundColor: group.color,
+                              borderColor: group.color,
+                            },
+                          ]}
+                          onPress={() => setSelectedMode(opt.mode)}
+                        >
+                          <Text
+                            style={[
+                              styles.subChipText,
+                              active && styles.subChipTextActive,
+                            ]}
+                          >
+                            {opt.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
               </TouchableOpacity>
             );
           })}
         </View>
+      </View>
 
-        {/* Sub-option chips for the currently active group (only if >1 option) */}
-        {(() => {
-          const activeGroup = QUIZ_MODE_GROUPS.find(
-            g => g.key === getGroupKeyForMode(selectedMode)
-          );
-          if (!activeGroup || activeGroup.modes.length <= 1) return null;
-          return (
-            <View style={styles.subOptions}>
-              <Text style={styles.subLabel}>出題する形</Text>
-              <View style={styles.subChipsRow}>
-                {activeGroup.modes.map(opt => {
-                  const active = selectedMode === opt.mode;
-                  return (
-                    <TouchableOpacity
-                      key={opt.mode}
-                      style={[
-                        styles.subChip,
-                        active && {
-                          backgroundColor: activeGroup.color,
-                          borderColor: activeGroup.color,
-                        },
-                      ]}
-                      onPress={() => setSelectedMode(opt.mode)}
-                    >
-                      <Text style={[styles.subChipText, active && styles.subChipTextActive]}>
-                        {opt.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          );
-        })()}
+      {/* ── 出題数 ── */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>🔢 出題数</Text>
+        <View style={styles.countChipsRow}>
+          {([5, 10, 20, 'all'] as QuestionCount[]).map(opt => {
+            const active = questionCount === opt;
+            const label = opt === 'all' ? '全問' : `${opt}問`;
+            return (
+              <TouchableOpacity
+                key={String(opt)}
+                style={[styles.countChip, active && styles.countChipActive]}
+                onPress={() => setQuestionCount(opt)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.countChipText,
+                    active && styles.countChipTextActive,
+                  ]}
+                >
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
 
       {/* ── 学習開始 ── */}
@@ -353,7 +395,7 @@ export default function StudyHomeScreen({ navigation, route }: Props) {
         <Text style={styles.noWordHint}>条件に一致する単語がありません。</Text>
       )}
       <Button
-        label={`学習開始（最大${defaultWordCount}問）`}
+        label={`学習開始（${effectiveQuestionCount}問）`}
         onPress={handleStart}
         disabled={wordCount === 0 || isCountLoading}
         loading={isStarting}
@@ -425,12 +467,16 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg, borderWidth: 2,
     borderColor: Colors.border, backgroundColor: Colors.surface, gap: Spacing.xs,
   },
+  modeCardFullWidth: { width: '100%' },
   modeIcon: { fontSize: 24 },
   modeLabel: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.text },
   modeDesc: { fontSize: FontSize.xs, color: Colors.textSecondary, lineHeight: 16 },
-  subOptions: { gap: 6 },
-  subLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.medium, color: Colors.textSecondary },
-  subChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
+  inlineSubChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.xs,
+    marginTop: Spacing.sm,
+  },
   subChip: {
     paddingHorizontal: Spacing.sm, paddingVertical: 5,
     borderRadius: BorderRadius.full, borderWidth: 1.5,
@@ -438,5 +484,25 @@ const styles = StyleSheet.create({
   },
   subChipText: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
   subChipTextActive: { color: Colors.textOnPrimary },
+  countChipsRow: { flexDirection: 'row', gap: Spacing.sm },
+  countChip: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+  },
+  countChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  countChipText: {
+    fontSize: FontSize.md,
+    color: Colors.textSecondary,
+    fontWeight: FontWeight.semibold,
+  },
+  countChipTextActive: { color: Colors.textOnPrimary },
   noWordHint: { fontSize: FontSize.sm, color: Colors.error, textAlign: 'center' },
 });
