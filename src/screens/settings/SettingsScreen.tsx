@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,10 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
+import * as Updates from 'expo-updates';
+import Constants from 'expo-constants';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useWordStore } from '@/store/wordStore';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants';
@@ -25,6 +28,53 @@ export default function SettingsScreen() {
   } = useSettingsStore();
 
   const { words } = useWordStore();
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+
+  // Values readable at build/runtime that tell us which bundle is executing.
+  const runtimeVersion =
+    (Updates as unknown as { runtimeVersion?: string }).runtimeVersion ??
+    Constants.expoConfig?.runtimeVersion ??
+    '-';
+  const channel = (Updates as unknown as { channel?: string }).channel ?? '-';
+  const updateId = Updates.updateId ?? '(embedded)';
+  const isEmbedded = !Updates.updateId;
+
+  const handleCheckForUpdate = async () => {
+    if (isCheckingUpdate) return;
+    setIsCheckingUpdate(true);
+    try {
+      const check = await Updates.checkForUpdateAsync();
+      if (!check.isAvailable) {
+        Alert.alert('更新なし', '最新です。\n(現在: ' + updateId + ')');
+        return;
+      }
+      const fetched = await Updates.fetchUpdateAsync();
+      if (fetched.isNew) {
+        Alert.alert(
+          '更新あり',
+          '新しい版をダウンロードしました。OKで再起動します。',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                Updates.reloadAsync();
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert('更新確認', 'ダウンロードされましたが新規ではありません。');
+      }
+    } catch (e) {
+      Alert.alert(
+        '更新エラー',
+        String(e instanceof Error ? e.message : e) +
+          '\n(OTAが無効なビルドか、ネットワーク不通の可能性があります)'
+      );
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -103,6 +153,42 @@ export default function SettingsScreen() {
             <Text style={styles.infoLabel}>登録単語数</Text>
             <Text style={styles.infoValue}>{words.length} 語</Text>
           </View>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>アプリの更新</Text>
+        <View style={styles.card}>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Runtime</Text>
+            <Text style={styles.infoValueSmall}>{runtimeVersion}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Channel</Text>
+            <Text style={styles.infoValueSmall}>{channel}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Update ID</Text>
+            <Text
+              style={styles.infoValueSmall}
+              numberOfLines={1}
+              ellipsizeMode="middle"
+            >
+              {isEmbedded ? '初期APK(embedded)' : updateId}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.updateBtn}
+            onPress={handleCheckForUpdate}
+            disabled={isCheckingUpdate}
+            activeOpacity={0.8}
+          >
+            {isCheckingUpdate ? (
+              <ActivityIndicator size="small" color={Colors.textOnPrimary} />
+            ) : (
+              <Text style={styles.updateBtnText}>更新を確認して適用</Text>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -197,6 +283,24 @@ const styles = StyleSheet.create({
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
     color: Colors.primary,
+  },
+  infoValueSmall: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    maxWidth: 220,
+  },
+  updateBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.sm + 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  updateBtnText: {
+    color: Colors.textOnPrimary,
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold,
   },
   apiNote: {
     fontSize: FontSize.sm,
