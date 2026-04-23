@@ -115,17 +115,38 @@ function definitionMatchesWord(defs: string[], word: string): boolean {
   });
 }
 
+function isUsuallyKana(sense: JishoSense | undefined): boolean {
+  if (!sense) return false;
+  const all = [
+    ...(sense.parts_of_speech ?? []),
+    ...(sense.tags ?? []),
+  ]
+    .join(' ')
+    .toLowerCase();
+  // JMdict's "uk" / "Usually written using kana alone" indicator surfaces in
+  // various forms across Jisho's API; match all of them.
+  return /usually written using kana|usu\.\s*kana|\buk\b/.test(all);
+}
+
 function formatJapanese(
   entry: JishoEntry,
   senseIndex: number,
   targetPos: PartOfSpeech
 ): string {
   const first = entry.japanese[0];
-  const base = first?.word ?? first?.reading ?? '';
+  if (!first) return '';
+
+  const sense = entry.senses[senseIndex];
+  // For senses tagged "usually kana", the kanji form is rare/unnatural
+  // (e.g. やる written as 遣る). Prefer the kana reading in that case.
+  const preferKana = isUsuallyKana(sense) && !!first.reading;
+  const base = preferKana
+    ? (first.reading as string)
+    : (first.word ?? first.reading ?? '');
   if (!base) return '';
 
   if (targetPos === 'verb') {
-    const poses = entry.senses[senseIndex]?.parts_of_speech ?? [];
+    const poses = sense?.parts_of_speech ?? [];
     const isSuruVerb = poses.some(p => /suru verb/i.test(p));
     if (isSuruVerb && !/する$/.test(base)) return base + 'する';
   }
