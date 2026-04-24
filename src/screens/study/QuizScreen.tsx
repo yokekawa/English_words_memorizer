@@ -12,14 +12,17 @@ import QuizQuestion from '@/components/quiz/QuizQuestion';
 import AnswerInput from '@/components/quiz/AnswerInput';
 import VirtualKeyboard from '@/components/quiz/VirtualKeyboard';
 import ProgressBar from '@/components/quiz/ProgressBar';
+import Button from '@/components/common/Button';
 import { useQuizStore } from '@/store/quizStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import { evaluateAnswerAny } from '@/services/scoringService';
 import { Colors, FontSize, FontWeight, Spacing } from '@/constants';
 
 type Props = NativeStackScreenProps<StudyStackParams, 'Quiz'>;
 
 const FEEDBACK_DELAY_MS = 1500;
 const MAX_WRONG_ATTEMPTS = 5;
+const PRACTICE_REPEATS = 3;
 
 export default function QuizScreen({ navigation }: Props) {
   const [input1, setInput1] = useState('');
@@ -28,6 +31,12 @@ export default function QuizScreen({ navigation }: Props) {
   const [feedbackState, setFeedbackState] = useState<boolean | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [wrongAttempts, setWrongAttempts] = useState(0);
+  // Review state: wrong answer submitted (not during practice), waiting for
+  // user to click "次の問題へ" or "練習する".
+  const [awaitingUserAction, setAwaitingUserAction] = useState(false);
+  // Number of practice repetitions remaining for the current question.
+  // 0 = normal mode; 1..PRACTICE_REPEATS = currently practicing.
+  const [practiceRemaining, setPracticeRemaining] = useState(0);
 
   const session = useQuizStore(s => s.session);
   const currentIndex = useQuizStore(s => s.currentIndex);
@@ -51,6 +60,8 @@ export default function QuizScreen({ navigation }: Props) {
     setActiveField(0);
     setWrongAttempts(0);
     setFeedbackState(null);
+    setAwaitingUserAction(false);
+    setPracticeRemaining(0);
   }, [currentIndex]);
 
   if (!session) return null;
@@ -72,10 +83,64 @@ export default function QuizScreen({ navigation }: Props) {
   const currentAcceptable = acceptableForField(activeField);
   const currentInput = activeField === 0 ? input1 : input2;
 
+  const advanceToNextQuestion = async () => {
+    const nextIdx = currentIndex + 1;
+    if (nextIdx >= session.questions.length) {
+      const result = await endSession();
+      if (result) {
+        navigation.replace('Result', { sessionId: result.sessionId });
+      }
+    } else {
+      nextQuestion();
+    }
+  };
+
+  const resetInputState = () => {
+    setInput1('');
+    setInput2('');
+    setActiveField(0);
+    setWrongAttempts(0);
+    setFeedbackState(null);
+  };
+
+  const fireFeedbackHaptic = (correct: boolean) => {
+    if (!hapticEnabled) return;
+    Haptics.notificationAsync(
+      correct
+        ? Haptics.NotificationFeedbackType.Success
+        : Haptics.NotificationFeedbackType.Error
+    );
+  };
+
   const doSubmit = async (ans1: string, ans2: string) => {
     if (isSubmitting || feedbackState !== null) return;
     setIsSubmitting(true);
 
+    // During practice, evaluate locally and do NOT record an attempt — the
+    // real stats for the word are set by the original submission only.
+    if (practiceRemaining > 0) {
+      const correct1 = evaluateAnswerAny(ans1, acceptableForField(0));
+      const correct2 = isDual
+        ? evaluateAnswerAny(ans2, acceptableForField(1))
+        : true;
+      const correct = correct1 && correct2;
+      setFeedbackState(correct);
+      fireFeedbackHaptic(correct);
+
+      setTimeout(() => {
+        setIsSubmitting(false);
+        const remaining = practiceRemaining - 1;
+        setPracticeRemaining(remaining);
+        if (remaining > 0) {
+          resetInputState();
+        } else {
+          advanceToNextQuestion();
+        }
+      }, FEEDBACK_DELAY_MS);
+      return;
+    }
+
+    // Normal mode: record the attempt to session stats.
     const attempt = await submitAnswer(ans1, isDual ? ans2 : undefined);
     if (!attempt) {
       setIsSubmitting(false);
@@ -83,27 +148,30 @@ export default function QuizScreen({ navigation }: Props) {
     }
 
     setFeedbackState(attempt.isCorrect);
-    if (hapticEnabled) {
-      Haptics.notificationAsync(
-        attempt.isCorrect
-          ? Haptics.NotificationFeedbackType.Success
-          : Haptics.NotificationFeedbackType.Error
-      );
-    }
+    fireFeedbackHaptic(attempt.isCorrect);
 
-    setTimeout(async () => {
+    if (attempt.isCorrect) {
+      // Auto-advance after brief feedback, as before.
+      setTimeout(() => {
+        setIsSubmitting(false);
+        advanceToNextQuestion();
+      }, FEEDBACK_DELAY_MS);
+    } else {
+      // Wrong: stop on this question until the user picks an action.
       setIsSubmitting(false);
+      setAwaitingUserAction(true);
+    }
+  };
 
-      const nextIdx = currentIndex + 1;
-      if (nextIdx >= session.questions.length) {
-        const result = await endSession();
-        if (result) {
-          navigation.replace('Result', { sessionId: result.sessionId });
-        }
-      } else {
-        nextQuestion();
-      }
-    }, FEEDBACK_DELAY_MS);
+  const handleGoNext = () => {
+    setAwaitingUserAction(false);
+    advanceToNextQuestion();
+  };
+
+  const handleStartPractice = () => {
+    setAwaitingUserAction(false);
+    setPracticeRemaining(PRACTICE_REPEATS);
+    resetInputState();
   };
 
   const handleKeyPress = (key: string) => {
@@ -196,6 +264,14 @@ export default function QuizScreen({ navigation }: Props) {
         </View>
       )}
 
+      {practiceRemaining > 0 && (
+        <View style={styles.practiceBar}>
+          <Text style={styles.practiceText}>
+            🔁 練習中  {PRACTICE_REPEATS - practiceRemaining + 1} / {PRACTICE_REPEATS}
+          </Text>
+        </View>
+      )}
+
       <View style={styles.inputContainer}>
         <AnswerInput
           value={input1}
@@ -221,10 +297,27 @@ export default function QuizScreen({ navigation }: Props) {
         )}
       </View>
 
-      <VirtualKeyboard
-        onKeyPress={handleKeyPress}
-        disabled={feedbackState !== null || isSubmitting}
-      />
+      {awaitingUserAction ? (
+        <View style={styles.reviewBar}>
+          <Button
+            label="練習する (3回)"
+            onPress={handleStartPractice}
+            variant="secondary"
+            style={styles.reviewBtn}
+          />
+          <Button
+            label="次の問題へ"
+            onPress={handleGoNext}
+            variant="primary"
+            style={styles.reviewBtn}
+          />
+        </View>
+      ) : (
+        <VirtualKeyboard
+          onKeyPress={handleKeyPress}
+          disabled={feedbackState !== null || isSubmitting}
+        />
+      )}
     </View>
   );
 }
@@ -255,5 +348,26 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
     color: Colors.error,
+  },
+  practiceBar: {
+    alignItems: 'center',
+    paddingVertical: Spacing.xs,
+    backgroundColor: Colors.primary + '18',
+  },
+  practiceText: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    color: Colors.primary,
+  },
+  reviewBar: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    backgroundColor: Colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  reviewBtn: {
+    flex: 1,
   },
 });
