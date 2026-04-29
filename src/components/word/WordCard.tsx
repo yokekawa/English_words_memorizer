@@ -103,7 +103,6 @@ const styles = StyleSheet.create({
   phonetic: {
     fontSize: FontSize.sm,
     color: Colors.textSecondary,
-    fontStyle: 'italic',
   },
   meaning: {
     fontSize: FontSize.lg,
