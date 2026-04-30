@@ -212,6 +212,23 @@ export default function SettingsScreen() {
               /sɔːs/ /ɡoʊ/ ʊ ɔ ə ɪ æ ʃ ː
             </Text>
           </View>
+          {words
+            .filter(w => w.phonetic?.text)
+            .slice(0, 5)
+            .map(w => (
+              <View key={w.id} style={styles.phoneticDump}>
+                <Text style={styles.fontDiagLabel}>{w.baseForm}:</Text>
+                <Text style={styles.fontDiagSample}>{w.phonetic!.text}</Text>
+                <Text style={styles.codepointDump}>
+                  {[...w.phonetic!.text]
+                    .map(
+                      ch =>
+                        `${ch}=U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`
+                    )
+                    .join(' ')}
+                </Text>
+              </View>
+            ))}
         </View>
       </View>
 
@@ -338,5 +355,16 @@ const styles = StyleSheet.create({
   fontDiagSample: {
     fontSize: FontSize.lg,
     color: Colors.text,
+  },
+  phoneticDump: {
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  codepointDump: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
 });
