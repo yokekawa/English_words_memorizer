@@ -20,6 +20,7 @@ import { getDatabase } from '@/database/db';
 import { WordRepository } from '@/database/repositories/wordRepository';
 import { ConjugationRepository } from '@/database/repositories/conjugationRepository';
 import { generateConjugations } from '@/api/conjugation/inflectorsService';
+import { lookupWord } from '@/api/dictionary/freeDictionaryClient';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants';
 
 type Props = NativeStackScreenProps<WordListStackParams, 'WordEdit'>;
@@ -49,6 +50,7 @@ export default function WordEditScreen({ navigation, route }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [isRefetchingPhonetic, setIsRefetchingPhonetic] = useState(false);
 
   const [editBaseForm, setEditBaseForm] = useState('');
   const [editJpMeaning, setEditJpMeaning] = useState('');
@@ -122,6 +124,32 @@ export default function WordEditScreen({ navigation, route }: Props) {
         },
       ]
     );
+  };
+
+  const handleRefetchPhonetic = async () => {
+    if (!word || isRefetchingPhonetic) return;
+    setIsRefetchingPhonetic(true);
+    try {
+      const result = await lookupWord(word.baseForm);
+      if (!result.phonetic?.text) {
+        Alert.alert('発音記号の再取得', '辞書から発音記号が取得できませんでした。');
+        return;
+      }
+      const db = await getDatabase();
+      const repo = new WordRepository(db);
+      await repo.update(word.id, { phonetic: result.phonetic });
+      await refreshWord(word.id);
+      await loadWord();
+      Alert.alert('完了', `発音記号を更新しました: ${result.phonetic.text}`);
+    } catch (e) {
+      Alert.alert(
+        '発音記号の再取得',
+        '辞書APIにアクセスできませんでした。\n' +
+          (e instanceof Error ? e.message : String(e))
+      );
+    } finally {
+      setIsRefetchingPhonetic(false);
+    }
   };
 
   const playAudio = async () => {
@@ -229,6 +257,15 @@ export default function WordEditScreen({ navigation, route }: Props) {
                     </Text>
                   </TouchableOpacity>
                 )}
+                <TouchableOpacity
+                  onPress={handleRefetchPhonetic}
+                  disabled={isRefetchingPhonetic}
+                  style={styles.audioBtn}
+                >
+                  <Text style={styles.audioBtnText}>
+                    {isRefetchingPhonetic ? '取得中...' : '🔄 再取得'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
             {word.exampleSentence && (
