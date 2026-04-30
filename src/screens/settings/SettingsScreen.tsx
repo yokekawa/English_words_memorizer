@@ -193,16 +193,11 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>APIについて</Text>
+        <Text style={styles.sectionTitle}>クレジット</Text>
         <View style={styles.card}>
           <Text style={styles.apiNote}>
-            このアプリは以下のサービスを使用しています:{'\n\n'}
-            • Google Cloud Vision API（OCR・要APIキー）{'\n'}
-            • Free Dictionary API（発音・品詞情報）{'\n'}
-            • Jisho / JMdict（日本語訳・無料）{'\n'}
-            • en-inflectors（活用形生成・ローカル）{'\n\n'}
-            OCRを使用するには .env ファイルに{'\n'}
-            GOOGLE_VISION_API_KEY を設定してください。
+            辞書・発音: Free Dictionary API{'\n'}
+            日本語訳: Jisho / JMdict
           </Text>
         </View>
       </View>
