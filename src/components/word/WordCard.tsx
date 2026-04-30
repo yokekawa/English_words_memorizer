@@ -103,6 +103,7 @@ const styles = StyleSheet.create({
   phonetic: {
     fontSize: FontSize.sm,
     color: Colors.textSecondary,
+    fontFamily: 'NotoSans_400Regular',
   },
   meaning: {
     fontSize: FontSize.lg,

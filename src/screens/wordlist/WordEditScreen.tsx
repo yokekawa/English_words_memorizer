@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
   posChipTextActive: { color: Colors.textOnPrimary },
   posHint: { fontSize: FontSize.xs, color: Colors.warning, marginTop: 2 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' },
-  phonetic: { fontSize: FontSize.sm, color: Colors.textSecondary },
+  phonetic: { fontSize: FontSize.sm, color: Colors.textSecondary, fontFamily: 'NotoSans_400Regular' },
   audioBtn: {
     paddingVertical: 4, paddingHorizontal: Spacing.sm,
     borderRadius: 16, backgroundColor: Colors.surfaceSecondary, borderWidth: 1, borderColor: Colors.border,
