@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import * as Updates from 'expo-updates';
-import * as Font from 'expo-font';
 import Constants from 'expo-constants';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useWordStore } from '@/store/wordStore';
@@ -194,45 +193,6 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>フォント診断</Text>
-        <View style={styles.card}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>NotoSans 読込</Text>
-            <Text style={styles.infoValue}>
-              {Font.isLoaded('NotoSans_400Regular') ? '✓ OK' : '✗ NG'}
-            </Text>
-          </View>
-          <View>
-            <Text style={styles.fontDiagLabel}>System (Roboto):</Text>
-            <Text style={styles.fontDiagSample}>/sɔːs/ /ɡoʊ/ ʊ ɔ ə ɪ æ ʃ ː</Text>
-          </View>
-          <View>
-            <Text style={styles.fontDiagLabel}>NotoSans:</Text>
-            <Text style={[styles.fontDiagSample, { fontFamily: 'NotoSans_400Regular' }]}>
-              /sɔːs/ /ɡoʊ/ ʊ ɔ ə ɪ æ ʃ ː
-            </Text>
-          </View>
-          {words
-            .filter(w => w.phonetic?.text)
-            .slice(0, 5)
-            .map(w => (
-              <View key={w.id} style={styles.phoneticDump}>
-                <Text style={styles.fontDiagLabel}>{w.baseForm}:</Text>
-                <Text style={styles.fontDiagSample}>{w.phonetic!.text}</Text>
-                <Text style={styles.codepointDump}>
-                  {[...w.phonetic!.text]
-                    .map(
-                      ch =>
-                        `${ch}=U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`
-                    )
-                    .join(' ')}
-                </Text>
-              </View>
-            ))}
-        </View>
-      </View>
-
-      <View style={styles.section}>
         <Text style={styles.sectionTitle}>APIについて</Text>
         <View style={styles.card}>
           <Text style={styles.apiNote}>
@@ -346,25 +306,5 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.textSecondary,
     lineHeight: 22,
-  },
-  fontDiagLabel: {
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
-    marginBottom: 2,
-  },
-  fontDiagSample: {
-    fontSize: FontSize.lg,
-    color: Colors.text,
-  },
-  phoneticDump: {
-    marginTop: Spacing.sm,
-    paddingTop: Spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  codepointDump: {
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
-    marginTop: 2,
   },
 });
