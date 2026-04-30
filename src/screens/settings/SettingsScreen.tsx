@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import * as Updates from 'expo-updates';
+import * as Font from 'expo-font';
 import Constants from 'expo-constants';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useWordStore } from '@/store/wordStore';
@@ -193,6 +194,28 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>フォント診断</Text>
+        <View style={styles.card}>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>NotoSans 読込</Text>
+            <Text style={styles.infoValue}>
+              {Font.isLoaded('NotoSans_400Regular') ? '✓ OK' : '✗ NG'}
+            </Text>
+          </View>
+          <View>
+            <Text style={styles.fontDiagLabel}>System (Roboto):</Text>
+            <Text style={styles.fontDiagSample}>/sɔːs/ /ɡoʊ/ ʊ ɔ ə ɪ æ ʃ ː</Text>
+          </View>
+          <View>
+            <Text style={styles.fontDiagLabel}>NotoSans:</Text>
+            <Text style={[styles.fontDiagSample, { fontFamily: 'NotoSans_400Regular' }]}>
+              /sɔːs/ /ɡoʊ/ ʊ ɔ ə ɪ æ ʃ ː
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>APIについて</Text>
         <View style={styles.card}>
           <Text style={styles.apiNote}>
@@ -306,5 +329,14 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.textSecondary,
     lineHeight: 22,
+  },
+  fontDiagLabel: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    marginBottom: 2,
+  },
+  fontDiagSample: {
+    fontSize: FontSize.lg,
+    color: Colors.text,
   },
 });
