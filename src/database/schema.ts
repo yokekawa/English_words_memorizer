@@ -59,6 +59,16 @@ export const CREATE_SAVED_RANGES_TABLE = `
   )
 `;
 
+export const CREATE_API_USAGE_TABLE = `
+  CREATE TABLE IF NOT EXISTS api_usage (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    feature     TEXT NOT NULL,
+    year_month  TEXT NOT NULL,
+    count       INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(feature, year_month)
+  )
+`;
+
 export const CREATE_INDEXES = [
   `CREATE INDEX IF NOT EXISTS idx_conjugations_word_id ON conjugations(word_id)`,
   `CREATE INDEX IF NOT EXISTS idx_attempts_word_id ON quiz_attempts(word_id)`,

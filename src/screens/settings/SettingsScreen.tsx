@@ -9,11 +9,17 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import * as Updates from 'expo-updates';
 import Constants from 'expo-constants';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useWordStore } from '@/store/wordStore';
-import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants';
+import { getDatabase } from '@/database/db';
+import {
+  ApiUsageRepository,
+  currentYearMonth,
+} from '@/database/repositories/apiUsageRepository';
+import { Colors, Spacing, BorderRadius, FontSize, FontWeight, OCR_MONTHLY_LIMIT } from '@/constants';
 
 const WORD_COUNTS = [5, 10, 15, 20, 30];
 
@@ -29,6 +35,22 @@ export default function SettingsScreen() {
 
   const { words } = useWordStore();
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [ocrUsage, setOcrUsage] = useState<number | null>(null);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const db = await getDatabase();
+        const repo = new ApiUsageRepository(db);
+        const count = await repo.getCount('ocr', currentYearMonth());
+        if (!cancelled) setOcrUsage(count);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
 
   // Values readable at build/runtime that tell us which bundle is executing.
   const runtimeVersion =
@@ -152,6 +174,12 @@ export default function SettingsScreen() {
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>登録単語数</Text>
             <Text style={styles.infoValue}>{words.length} 語</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>今月の画像取り込み</Text>
+            <Text style={styles.infoValue}>
+              {ocrUsage === null ? '-' : `${ocrUsage} / ${OCR_MONTHLY_LIMIT}`}
+            </Text>
           </View>
         </View>
       </View>

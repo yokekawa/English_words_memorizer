@@ -12,7 +12,12 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RegistrationStackParams } from '@/types';
 import { recognizeText } from '@/api/ocr/googleVisionClient';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants';
+import { getDatabase } from '@/database/db';
+import {
+  ApiUsageRepository,
+  currentYearMonth,
+} from '@/database/repositories/apiUsageRepository';
+import { Colors, Spacing, BorderRadius, FontSize, FontWeight, OCR_MONTHLY_LIMIT } from '@/constants';
 
 type Props = NativeStackScreenProps<RegistrationStackParams, 'Camera'>;
 
@@ -42,6 +47,18 @@ export default function CameraScreen({ navigation }: Props) {
     if (!cameraRef.current || isProcessing) return;
     setIsProcessing(true);
     try {
+      const db = await getDatabase();
+      const usageRepo = new ApiUsageRepository(db);
+      const yearMonth = currentYearMonth();
+      const usedThisMonth = await usageRepo.getCount('ocr', yearMonth);
+      if (usedThisMonth >= OCR_MONTHLY_LIMIT) {
+        Alert.alert(
+          '今月の取り込み上限に達しました',
+          `画像からの単語取り込みは月${OCR_MONTHLY_LIMIT}回までです (今月使用: ${usedThisMonth}回)。\n\n手動入力での単語登録は引き続きご利用いただけます。次月初に自動でリセットされます。`
+        );
+        return;
+      }
+
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.8,
         base64: false,
@@ -63,6 +80,10 @@ export default function CameraScreen({ navigation }: Props) {
         manipulated.width,
         manipulated.height
       );
+
+      // Count the call only after a successful API response so failures
+      // don't burn the user's monthly budget.
+      await usageRepo.increment('ocr', yearMonth);
 
       if (!ocrResult.fullText.trim()) {
         Alert.alert(
