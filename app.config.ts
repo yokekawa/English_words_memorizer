@@ -51,6 +51,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         androidAppId: 'ca-app-pub-4248382033901204~8727658558',
       },
     ],
+    './plugins/withAdiRegistration',
   ],
   extra: {
     googleVisionApiKey: process.env.GOOGLE_VISION_API_KEY ?? '',
