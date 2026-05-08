@@ -44,6 +44,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         microphonePermission: false,
       },
     ],
+    [
+      'react-native-google-mobile-ads',
+      {
+        androidAppId: 'ca-app-pub-4248382033901204~8727658558',
+      },
+    ],
   ],
   extra: {
     googleVisionApiKey: process.env.GOOGLE_VISION_API_KEY ?? '',
@@ -52,6 +58,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     androidPackage: 'com.yokekawa.englishwordsmemorizer',
     androidCertSha1: process.env.ANDROID_CERT_SHA1 ?? '',
-
+    admobBannerAdUnitId: 'ca-app-pub-4248382033901204/9999387942',
   },
 });

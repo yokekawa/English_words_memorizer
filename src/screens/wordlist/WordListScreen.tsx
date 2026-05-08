@@ -12,6 +12,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { WordListStackParams, Word } from '@/types';
 import WordCard from '@/components/word/WordCard';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import BannerAdContainer from '@/components/ads/BannerAdContainer';
 import { useWordStore } from '@/store/wordStore';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants';
 
@@ -196,6 +197,7 @@ export default function WordListScreen({ navigation }: Props) {
           ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
       )}
+      <BannerAdContainer />
     </View>
   );
 }
