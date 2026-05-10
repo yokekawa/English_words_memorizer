@@ -303,14 +303,17 @@ export async function translateToJapanese(
     if (override) return override;
   }
 
-  // Jisho's search ranks by reading/romaji match first, which surfaces junk
-  // like 度 (reading "do") ahead of する for a bare "do" query. For verbs we
-  // force a quoted English-definition search ("to do") first; if that fails
-  // to produce a POS-matching result, fall back to the plain keyword.
+  // Jisho ranks by both English definitions and Japanese reading romaji,
+  // which is why bare 'china' surfaces 地内 (chinai) and bare 'be' surfaces
+  // 弁当 (bento) — the romaji-prefix match wins. Wrapping the word in
+  // double quotes constrains Jisho to exact English-definition matching,
+  // which excludes romaji collisions entirely.
+  // We try quoted forms first and only fall back to the bare keyword if
+  // nothing usable comes back, so rare words still resolve.
   const queries =
     partOfSpeech === 'verb'
-      ? [`"to ${word}"`, word]
-      : [word];
+      ? [`"to ${word}"`, `"${word}"`, word]
+      : [`"${word}"`, word];
 
   let bestOverall:
     | { entry: JishoEntry; senseIndex: number; score: number }
