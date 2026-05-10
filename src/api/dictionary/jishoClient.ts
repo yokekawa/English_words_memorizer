@@ -133,6 +133,7 @@ interface JishoSense {
   english_definitions: string[];
   parts_of_speech: string[];
   tags?: string[];
+  info?: string[];
 }
 
 interface JishoEntry {
@@ -242,7 +243,8 @@ function scoreEntry(
   entry.senses.forEach((sense, i) => {
     const tagsJoined = (sense.tags ?? []).join(' ').toLowerCase();
     const posJoined = sense.parts_of_speech.join(' ').toLowerCase();
-    const combined = `${posJoined} ${tagsJoined}`;
+    const infoJoined = (sense.info ?? []).join(' ').toLowerCase();
+    const combined = `${posJoined} ${tagsJoined} ${infoJoined}`;
 
     let score = 0;
     if (matchesPos(sense.parts_of_speech, targetPos)) {
@@ -266,6 +268,11 @@ function scoreEntry(
     if (/\bobscure\b|\brare\b/.test(combined)) score -= 120;
     if (/\bhumble\b|\bhonorific\b|\bpolite\b/.test(combined)) score -= 80;
     if (/\bderogatory\b|\bvulgar\b|\bslang\b/.test(combined)) score -= 60;
+    // "Usu. in compounds" / "esp. in compounds" entries (e.g. 中華 for "China")
+    // are valid but read as parts of compound words, not as the standalone
+    // translation a learner expects from a single keyword. Push them down
+    // hard so the standalone form (e.g. 中国) wins.
+    if (/\bin compounds?\b|\bcompound\s*word/.test(combined)) score -= 100;
 
     if (score > bestScore) {
       bestScore = score;
