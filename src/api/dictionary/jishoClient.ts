@@ -3,69 +3,6 @@ import { PartOfSpeech } from '@/types';
 const BASE_URL = 'https://jisho.org/api/v1/search/words';
 
 /**
- * POS-independent overrides for words where Jisho's keyword search
- * structurally fails. Two main classes live here:
- *
- *  1. Proper nouns / culturally fixed nouns. Jisho matches on Japanese
- *     reading romaji as well as English defs, so "china" surfaces 地内
- *     (chinai) before 中国 — whose reading "ちゅうごく" doesn't match
- *     "china" at all and therefore never appears in the result set.
- *  2. The English copula and a few core auxiliaries (be, have). These
- *     are too short and too overloaded for any heuristic ranking to do
- *     the right thing, and POS detection on them is also unstable.
- *
- * Applied before any Jisho call regardless of detected POS, because
- * for every word in this list the answer is unambiguous.
- */
-const UNIVERSAL_OVERRIDES: Record<string, string> = {
-  // Copula / core auxiliaries
-  be:   'である',
-  have: '持つ',
-
-  // Countries (English name → standard Japanese)
-  china:     '中国',
-  america:   'アメリカ',
-  japan:     '日本',
-  korea:     '韓国',
-  england:   'イングランド',
-  britain:   'イギリス',
-  france:    'フランス',
-  germany:   'ドイツ',
-  italy:     'イタリア',
-  spain:     'スペイン',
-  russia:    'ロシア',
-  canada:    'カナダ',
-  australia: 'オーストラリア',
-  india:     'インド',
-  brazil:    'ブラジル',
-  vietnam:   'ベトナム',
-  thailand:  'タイ',
-
-  // Days of the week
-  monday:    '月曜日',
-  tuesday:   '火曜日',
-  wednesday: '水曜日',
-  thursday:  '木曜日',
-  friday:    '金曜日',
-  saturday:  '土曜日',
-  sunday:    '日曜日',
-
-  // Months
-  january:   '1月',
-  february:  '2月',
-  march:     '3月',
-  april:     '4月',
-  may:       '5月',
-  june:      '6月',
-  july:      '7月',
-  august:    '8月',
-  september: '9月',
-  october:   '10月',
-  november:  '11月',
-  december:  '12月',
-};
-
-/**
  * Curated override for basic high-frequency verbs where Jisho's keyword search
  * surfaces valid-but-non-canonical forms (e.g. 遣る or 執り行う instead of する).
  * Only applied when the target POS is verb.
@@ -299,10 +236,6 @@ export async function translateToJapanese(
   partOfSpeech: PartOfSpeech
 ): Promise<string> {
   const lower = word.toLowerCase();
-
-  // Universal overrides: proper nouns and core copula/auxiliaries where
-  // Jisho's search would never surface the canonical Japanese form.
-  if (UNIVERSAL_OVERRIDES[lower]) return UNIVERSAL_OVERRIDES[lower];
 
   // Curated override: top-frequency verbs where Jisho's ranking is unreliable.
   if (partOfSpeech === 'verb') {
