@@ -151,6 +151,11 @@ function matchesPos(jishoPoses: string[], target: PartOfSpeech): boolean {
   switch (target) {
     case 'verb':
       return /\bverb\b|ichidan|godan|kuru verb|suru verb/.test(joined);
+    case 'auxiliary':
+      // JMdict tags Japanese auxiliary verbs as "auxiliary verb" / "aux-v";
+      // English modals don't have a clean Japanese equivalent, but the closest
+      // matches are still in this tagged subset.
+      return /auxiliary|\baux-v\b|\baux\b/.test(joined);
     case 'noun':
       return /\bnoun\b/.test(joined);
     case 'adjective':
@@ -165,6 +170,11 @@ function matchesPos(jishoPoses: string[], target: PartOfSpeech): boolean {
       return /conjunction/.test(joined);
     case 'interjection':
       return /interjection/.test(joined);
+    case 'determiner':
+      // Jisho/JMdict doesn't have a "determiner" POS tag — treat as no match
+      // and fall back to is_common scoring; almost no English determiner has
+      // a meaningful Japanese single-word translation anyway.
+      return /determiner|article/.test(joined);
     default:
       return false;
   }

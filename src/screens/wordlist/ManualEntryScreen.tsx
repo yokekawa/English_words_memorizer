@@ -25,12 +25,14 @@ type Props = NativeStackScreenProps<WordListStackParams, 'ManualEntry'>;
 const POS_OPTIONS: { pos: PartOfSpeech; label: string }[] = [
   { pos: 'noun',         label: '名詞' },
   { pos: 'verb',         label: '動詞' },
+  { pos: 'auxiliary',    label: '助動詞' },
   { pos: 'adjective',    label: '形容詞' },
   { pos: 'adverb',       label: '副詞' },
   { pos: 'pronoun',      label: '代名詞' },
   { pos: 'preposition',  label: '前置詞' },
   { pos: 'conjunction',  label: '接続詞' },
   { pos: 'interjection', label: '感嘆詞' },
+  { pos: 'determiner',   label: '限定詞' },
   { pos: 'unknown',      label: 'その他' },
 ];
 

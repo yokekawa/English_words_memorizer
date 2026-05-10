@@ -18,12 +18,14 @@ type Props = NativeStackScreenProps<StudyStackParams, 'WordSelection'>;
 const POS_CONFIG: Partial<Record<PartOfSpeech, { label: string; color: string }>> = {
   noun:         { label: '名詞',   color: '#10b981' },
   verb:         { label: '動詞',   color: '#3b82f6' },
+  auxiliary:    { label: '助動詞', color: '#0ea5e9' },
   adjective:    { label: '形容詞', color: '#8b5cf6' },
   adverb:       { label: '副詞',   color: '#f59e0b' },
   pronoun:      { label: '代名詞', color: '#ec4899' },
   preposition:  { label: '前置詞', color: '#ef4444' },
   conjunction:  { label: '接続詞', color: '#6366f1' },
   interjection: { label: '感嘆詞', color: '#14b8a6' },
+  determiner:   { label: '限定詞', color: '#a855f7' },
   unknown:      { label: 'その他', color: '#94a3b8' },
 };
 

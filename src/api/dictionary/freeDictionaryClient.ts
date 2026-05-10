@@ -84,7 +84,31 @@ const POS_MAP: Record<string, PartOfSpeech> = {
   preposition: 'preposition',
   conjunction: 'conjunction',
   interjection: 'interjection',
+  determiner: 'determiner',
+  article: 'determiner',
 };
+
+/**
+ * English's modal/auxiliary closed class. Free Dictionary returns these
+ * as plain "verb", which makes them appear conjugatable in our UI even
+ * though they aren't (you don't say "canned" for the modal "can"). We
+ * post-process the dictionary's POS verdict and reclassify any of these
+ * as 'auxiliary' so they're treated as a separate, non-conjugating POS.
+ */
+const MODAL_VERBS = new Set([
+  'can',
+  'could',
+  'will',
+  'would',
+  'shall',
+  'should',
+  'may',
+  'might',
+  'must',
+  'ought',
+  'dare',
+  'need',
+]);
 
 export async function lookupWord(word: string): Promise<DictionaryResult> {
   const url = `${BASE_URL}/${encodeURIComponent(word.toLowerCase())}`;
@@ -118,6 +142,14 @@ export async function lookupWord(word: string): Promise<DictionaryResult> {
   let maxScore = 0;
   for (const [pos, score] of posScores) {
     if (score > maxScore) { maxScore = score; partOfSpeech = pos; }
+  }
+
+  // Reclassify modals: Free Dictionary tags can/will/may/etc. as plain verbs,
+  // but they're a closed auxiliary class with no -ed/-ing/-s forms. Treating
+  // them as 'auxiliary' prevents the conjugation generator from inventing
+  // forms like "canned" for the modal "can".
+  if (MODAL_VERBS.has(entry.word.toLowerCase())) {
+    partOfSpeech = 'auxiliary';
   }
 
   const chosenMeaning =

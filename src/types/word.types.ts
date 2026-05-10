@@ -1,12 +1,14 @@
 export type PartOfSpeech =
   | 'noun'
   | 'verb'
+  | 'auxiliary'
   | 'adjective'
   | 'adverb'
   | 'pronoun'
   | 'preposition'
   | 'conjunction'
   | 'interjection'
+  | 'determiner'
   | 'unknown';
 
 export type ConjugationType =
