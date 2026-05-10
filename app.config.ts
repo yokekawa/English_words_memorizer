@@ -30,7 +30,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: '#1a56db',
     },
     package: 'com.yokekawa.englishwordsmemorizer',
-    versionCode: 2,
+    versionCode: 3,
   },
   plugins: [
     [
