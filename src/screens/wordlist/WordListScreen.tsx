@@ -184,7 +184,8 @@ export default function WordListScreen({ navigation }: Props) {
         <FlatList
           data={filteredAndSorted}
           keyExtractor={item => String(item.id)}
-          contentContainerStyle={styles.list}
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
           renderItem={({ item }) => (
             <WordCard
               word={item}
@@ -288,7 +289,8 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.medium,
   },
   letterChipCountActive: { color: Colors.textOnPrimary, opacity: 0.85 },
-  list: {
+  list: { flex: 1 },
+  listContent: {
     padding: Spacing.md,
     paddingBottom: Spacing.xl,
   },
