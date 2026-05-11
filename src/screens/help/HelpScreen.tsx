@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import BannerAdContainer from '@/components/ads/BannerAdContainer';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants';
 
 // --- Mock illustration building blocks ---
@@ -112,6 +113,7 @@ function Step({
 
 export default function HelpScreen() {
   return (
+    <View style={styles.outerContainer}>
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.intro}>
         <Text style={styles.appTitle}>英単語暗記アプリの使い方</Text>
@@ -351,12 +353,15 @@ export default function HelpScreen() {
         </Text>
       </View>
     </ScrollView>
+    <BannerAdContainer />
+    </View>
   );
 }
 
 // --- Styles ---
 
 const styles = StyleSheet.create({
+  outerContainer: { flex: 1, backgroundColor: Colors.background },
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: Spacing.md, gap: Spacing.lg, paddingBottom: Spacing.xl },
   intro: { gap: Spacing.xs, marginBottom: Spacing.sm },

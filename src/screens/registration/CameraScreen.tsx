@@ -17,7 +17,16 @@ import {
   ApiUsageRepository,
   currentYearMonth,
 } from '@/database/repositories/apiUsageRepository';
-import { Colors, Spacing, BorderRadius, FontSize, FontWeight, OCR_MONTHLY_LIMIT } from '@/constants';
+import { showRewardedAd } from '@/components/ads/RewardedAdManager';
+import {
+  Colors,
+  Spacing,
+  BorderRadius,
+  FontSize,
+  FontWeight,
+  OCR_MONTHLY_BASE_LIMIT,
+  OCR_REWARD_PER_AD,
+} from '@/constants';
 
 type Props = NativeStackScreenProps<RegistrationStackParams, 'Camera'>;
 
@@ -43,6 +52,21 @@ export default function CameraScreen({ navigation }: Props) {
     );
   }
 
+  const grantBonus = async (): Promise<boolean> => {
+    const earned = await showRewardedAd();
+    if (!earned) {
+      Alert.alert(
+        '広告を視聴できませんでした',
+        '通信状況などにより広告を表示できませんでした。少し時間を置いて再度お試しください。'
+      );
+      return false;
+    }
+    const db = await getDatabase();
+    const usageRepo = new ApiUsageRepository(db);
+    await usageRepo.increment('ocr_bonus', currentYearMonth(), OCR_REWARD_PER_AD);
+    return true;
+  };
+
   const takePicture = async () => {
     if (!cameraRef.current || isProcessing) return;
     setIsProcessing(true);
@@ -50,11 +74,23 @@ export default function CameraScreen({ navigation }: Props) {
       const db = await getDatabase();
       const usageRepo = new ApiUsageRepository(db);
       const yearMonth = currentYearMonth();
-      const usedThisMonth = await usageRepo.getCount('ocr', yearMonth);
-      if (usedThisMonth >= OCR_MONTHLY_LIMIT) {
+      const used = await usageRepo.getCount('ocr', yearMonth);
+      const bonus = await usageRepo.getCount('ocr_bonus', yearMonth);
+      const effectiveLimit = OCR_MONTHLY_BASE_LIMIT + bonus;
+      if (used >= effectiveLimit) {
+        setIsProcessing(false);
         Alert.alert(
-          '今月の取り込み上限に達しました',
-          `画像からの単語取り込みは月${OCR_MONTHLY_LIMIT}回までです (今月使用: ${usedThisMonth}回)。\n\n手動入力での単語登録は引き続きご利用いただけます。次月初に自動でリセットされます。`
+          '今月の取り込み枠を使い切りました',
+          `今月の OCR 利用可能数 (${effectiveLimit}回) をすべて使い切りました。\n\n動画広告 (約30秒) を1本見ると、追加で ${OCR_REWARD_PER_AD} 回ご利用いただけます。`,
+          [
+            { text: 'キャンセル', style: 'cancel' },
+            {
+              text: '広告を見る',
+              onPress: async () => {
+                await grantBonus();
+              },
+            },
+          ]
         );
         return;
       }

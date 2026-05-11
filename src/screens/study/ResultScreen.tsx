@@ -10,6 +10,8 @@ import { StudyStackParams, QuizResult } from '@/types';
 import { useQuizStore } from '@/store/quizStore';
 import { buildResult } from '@/services/scoringService';
 import Button from '@/components/common/Button';
+import BannerAdContainer from '@/components/ads/BannerAdContainer';
+import { maybeShowInterstitial } from '@/components/ads/InterstitialAdManager';
 import {
   Colors,
   Spacing,
@@ -64,6 +66,10 @@ export default function ResultScreen({ navigation }: Props) {
       : '全単語';
 
   const handleRetry = async () => {
+    // Trigger an interstitial at this natural break point (post-quiz, before
+    // returning to the study home). The manager honours per-N-trigger and
+    // daily caps so this stays unobtrusive even after many quizzes.
+    maybeShowInterstitial();
     clearSession();
     navigation.replace('StudyHome');
   };
@@ -77,6 +83,7 @@ export default function ResultScreen({ navigation }: Props) {
   };
 
   return (
+    <View style={styles.outerContainer}>
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Score card */}
       <View style={styles.scoreCard}>
@@ -149,10 +156,13 @@ export default function ResultScreen({ navigation }: Props) {
         <Button label="学習ホームへ戻る" onPress={handleRetry} />
       </View>
     </ScrollView>
+    <BannerAdContainer />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  outerContainer: { flex: 1, backgroundColor: Colors.background },
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xl },
   scoreCard: {

@@ -1,6 +1,6 @@
 import { Database, queryFirst, execute } from '../helpers';
 
-export type ApiFeature = 'ocr';
+export type ApiFeature = 'ocr' | 'ocr_bonus';
 
 export class ApiUsageRepository {
   constructor(private db: Database) {}
@@ -14,12 +14,12 @@ export class ApiUsageRepository {
     return row?.count ?? 0;
   }
 
-  async increment(feature: ApiFeature, yearMonth: string): Promise<number> {
+  async increment(feature: ApiFeature, yearMonth: string, by = 1): Promise<number> {
     await execute(
       this.db,
-      `INSERT INTO api_usage (feature, year_month, count) VALUES (?, ?, 1)
-       ON CONFLICT(feature, year_month) DO UPDATE SET count = count + 1`,
-      [feature, yearMonth]
+      `INSERT INTO api_usage (feature, year_month, count) VALUES (?, ?, ?)
+       ON CONFLICT(feature, year_month) DO UPDATE SET count = count + ?`,
+      [feature, yearMonth, by, by]
     );
     return this.getCount(feature, yearMonth);
   }

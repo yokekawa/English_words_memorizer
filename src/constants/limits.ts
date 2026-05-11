@@ -1,7 +1,15 @@
 /**
- * Soft cap on Google Cloud Vision API calls per calendar month, per device.
- * Acts purely as a safety net against runaway API spend if the app gets
- * unexpectedly heavy use; a typical learner takes a handful of photos per
- * month and never gets close to this.
+ * Free monthly OCR quota baked into the app. Users get this many calls per
+ * calendar month without doing anything. Beyond this they can watch a rewarded
+ * ad to add OCR_REWARD_PER_AD more calls — repeatable, with no upper bound:
+ * every ad-funded scan is comfortably revenue-positive against Vision API
+ * pricing, so capping the total would just leave money on the table while
+ * frustrating heavy users.
  */
-export const OCR_MONTHLY_LIMIT = 50;
+export const OCR_MONTHLY_BASE_LIMIT = 10;
+
+/**
+ * OCR calls granted per rewarded ad view. Triggered after the AdMob SDK fires
+ * EARNED_REWARD, so the counter never advances without an actual ad view.
+ */
+export const OCR_REWARD_PER_AD = 5;

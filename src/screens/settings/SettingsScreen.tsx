@@ -19,7 +19,15 @@ import {
   ApiUsageRepository,
   currentYearMonth,
 } from '@/database/repositories/apiUsageRepository';
-import { Colors, Spacing, BorderRadius, FontSize, FontWeight, OCR_MONTHLY_LIMIT } from '@/constants';
+import BannerAdContainer from '@/components/ads/BannerAdContainer';
+import {
+  Colors,
+  Spacing,
+  BorderRadius,
+  FontSize,
+  FontWeight,
+  OCR_MONTHLY_BASE_LIMIT,
+} from '@/constants';
 
 const WORD_COUNTS = [5, 10, 15, 20, 30];
 
@@ -36,6 +44,7 @@ export default function SettingsScreen() {
   const { words } = useWordStore();
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [ocrUsage, setOcrUsage] = useState<number | null>(null);
+  const [ocrBonus, setOcrBonus] = useState<number>(0);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -43,8 +52,13 @@ export default function SettingsScreen() {
       (async () => {
         const db = await getDatabase();
         const repo = new ApiUsageRepository(db);
-        const count = await repo.getCount('ocr', currentYearMonth());
-        if (!cancelled) setOcrUsage(count);
+        const ym = currentYearMonth();
+        const used = await repo.getCount('ocr', ym);
+        const bonus = await repo.getCount('ocr_bonus', ym);
+        if (!cancelled) {
+          setOcrUsage(used);
+          setOcrBonus(bonus);
+        }
       })();
       return () => {
         cancelled = true;
@@ -99,6 +113,7 @@ export default function SettingsScreen() {
   };
 
   return (
+    <View style={styles.outerContainer}>
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>学習設定</Text>
@@ -178,9 +193,16 @@ export default function SettingsScreen() {
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>今月の画像取り込み</Text>
             <Text style={styles.infoValue}>
-              {ocrUsage === null ? '-' : `${ocrUsage} / ${OCR_MONTHLY_LIMIT}`}
+              {ocrUsage === null
+                ? '-'
+                : `${ocrUsage} / ${OCR_MONTHLY_BASE_LIMIT + ocrBonus}`}
             </Text>
           </View>
+          {ocrBonus > 0 && (
+            <Text style={styles.ocrBonusNote}>
+              (無料 {OCR_MONTHLY_BASE_LIMIT} + 広告で獲得 {ocrBonus})
+            </Text>
+          )}
         </View>
       </View>
 
@@ -230,12 +252,16 @@ export default function SettingsScreen() {
         </View>
       </View>
     </ScrollView>
+    <BannerAdContainer />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  outerContainer: { flex: 1, backgroundColor: Colors.background },
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: Spacing.md, gap: Spacing.lg, paddingBottom: Spacing.xl },
+  ocrBonusNote: { fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right' },
   section: { gap: Spacing.sm },
   sectionTitle: {
     fontSize: FontSize.sm,
