@@ -62,9 +62,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     androidCertSha1: process.env.ANDROID_CERT_SHA1 ?? '',
     admobBannerAdUnitId:       'ca-app-pub-4248382033901204/9999387942',
     admobInterstitialAdUnitId: 'ca-app-pub-4248382033901204/4236379624',
-    // TODO: replace with the rewarded ad unit from AdMob once issued.
-    // Until then the runtime falls back to Google's test rewarded unit
-    // so OCR-quota top-up still works for internal testing.
-    admobRewardedAdUnitId:     '',
+    admobRewardedAdUnitId:     'ca-app-pub-4248382033901204/1258862495',
   },
 });
